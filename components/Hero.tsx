@@ -6,11 +6,15 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Link from 'next/link';
 
 const Hero: FC = () => {
-  const { connected } = useWallet();
   const [isVisible, setIsVisible] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [isClient, setIsClient] = useState(false);
+  
+  const wallet = useWallet();
+  const connected = isClient ? wallet.connected : false;
   
   useEffect(() => {
+    setIsClient(true);
     setIsVisible(true);
     
     const handleMouseMove = (e: MouseEvent) => {
@@ -85,7 +89,7 @@ const Hero: FC = () => {
             {!connected ? (
               <>
                 <div className="group">
-                  <WalletMultiButton className="!bg-gradient-to-r !from-primary !to-secondary !text-black !font-bold !text-lg !px-8 !py-4 !rounded-xl !transition-all !duration-300 hover:!scale-105 hover:!shadow-2xl hover:!shadow-primary/50" />
+                  {isClient && <WalletMultiButton className="!bg-gradient-to-r !from-primary !to-secondary !text-black !font-bold !text-lg !px-8 !py-4 !rounded-xl !transition-all !duration-300 hover:!scale-105 hover:!shadow-2xl hover:!shadow-primary/50" />}
                 </div>
                 <Link 
                   href="#bots" 

@@ -21,18 +21,29 @@ function getBotId(id: string): string {
 
 const BotsSection: FC = () => {
   // Individual risk settings for each bot (1-50%)
-  const [volumeTrackerRisk, setVolumeTrackerRisk] = useState(getBotRisk('volume-tracker'));
-  const [momentumBotRisk, setMomentumBotRisk] = useState(getBotRisk('trend-surfer'));
-  const [dipHunterRisk, setDipHunterRisk] = useState(getBotRisk('dip-hunter'));
+  const [volumeTrackerRisk, setVolumeTrackerRisk] = useState(5); // Default value
+  const [momentumBotRisk, setMomentumBotRisk] = useState(5); // Default value
+  const [dipHunterRisk, setDipHunterRisk] = useState(5); // Default value
   
   // Lokalen Zustand für Bot-Status verwenden
-  const [botStatuses, setBotStatuses] = useState(getAllBotStatus());
+  const [botStatuses, setBotStatuses] = useState(new Map());
   
-  const { publicKey } = useWallet();
-  const { connected } = useWallet();
+  // Client-side hydration protection
+  const [isClient, setIsClient] = useState(false);
+  const wallet = useWallet();
+  
+  const publicKey = isClient ? wallet.publicKey : null;
+  const connected = isClient ? wallet.connected : false;
 
-  // Regelmäßig den Status aus localStorage abrufen
+  // Client-side hydration
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Regelmäßig den Status aus localStorage abrufen (nur client-side)
+  useEffect(() => {
+    if (!isClient) return;
+    
     // Initial laden
     setBotStatuses(getAllBotStatus());
     
@@ -54,7 +65,7 @@ const BotsSection: FC = () => {
     }, 2000);
     
     return () => clearInterval(statusInterval);
-  }, []);
+  }, [isClient]);
   
   // Handle bot status change
   const handleStatusChange = (id: string, status: 'active' | 'paused') => {
