@@ -5,10 +5,5 @@
       "PRISMA_CLI_BINARY_TARGETS": "native",
       "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/solana_bots?schema=public"
     }
-  },
-  "functions": {
-    "app/api/**/*.ts": {
-      "runtime": "nodejs18.x"
-    }
   }
 } 
