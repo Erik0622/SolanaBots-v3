@@ -5,12 +5,17 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { CustomBot } from './useCustomBots';
 
 export function useFavoriteBots() {
-  const { publicKey } = useWallet();
+  const wallet = useWallet();
   const [favoriteBots, setFavoriteBots] = useState<string[]>([]);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // Load favorite bots from localStorage
-    if (typeof window !== 'undefined') {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    // Load favorite bots from localStorage only on client
+    if (isClient && typeof window !== 'undefined') {
       const saved = localStorage.getItem('favoriteBots');
       if (saved) {
         try {
@@ -20,9 +25,11 @@ export function useFavoriteBots() {
         }
       }
     }
-  }, []);
+  }, [isClient]);
 
   const toggleFavorite = (botId: string) => {
+    if (!isClient) return;
+    
     const updatedFavorites = favoriteBots.includes(botId)
       ? favoriteBots.filter(id => id !== botId)
       : [...favoriteBots, botId];
@@ -35,21 +42,23 @@ export function useFavoriteBots() {
   };
 
   const isBotFavorite = (botId: string) => {
-    return favoriteBots.includes(botId);
+    return isClient ? favoriteBots.includes(botId) : false;
   };
 
   const addFavorite = (botId: string) => {
-    if (!favoriteBots.includes(botId)) {
-      const updatedFavorites = [...favoriteBots, botId];
-      setFavoriteBots(updatedFavorites);
-      
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('favoriteBots', JSON.stringify(updatedFavorites));
-      }
+    if (!isClient || favoriteBots.includes(botId)) return;
+    
+    const updatedFavorites = [...favoriteBots, botId];
+    setFavoriteBots(updatedFavorites);
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('favoriteBots', JSON.stringify(updatedFavorites));
     }
   };
 
   const removeFavorite = (botId: string) => {
+    if (!isClient) return;
+    
     const updatedFavorites = favoriteBots.filter(id => id !== botId);
     setFavoriteBots(updatedFavorites);
     

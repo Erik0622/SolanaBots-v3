@@ -9,17 +9,24 @@ import { usePathname } from 'next/navigation';
 const Navigation: FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { connected } = useWallet();
+  const [isClient, setIsClient] = useState(false);
+  const wallet = useWallet();
   const pathname = usePathname();
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+    
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
     
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isClient]);
   
   const isActive = (path: string) => pathname === path;
 
@@ -61,12 +68,12 @@ const Navigation: FC = () => {
           <a href="#faq" className="text-white/80 hover:text-primary transition-colors">
             FAQ
           </a>
-          <WalletMultiButton />
+          {isClient && <WalletMultiButton />}
         </div>
 
         {/* Mobile Menu Button */}
-        <div className="md:hidden flex items-center">
-          <WalletMultiButton className="mr-4" />
+        <div className="flex md:hidden items-center">
+          {isClient && <WalletMultiButton className="mr-4" />}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="text-white focus:outline-none"
@@ -86,18 +93,14 @@ const Navigation: FC = () => {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-dark-lighter mt-4 py-4 px-6 rounded-lg shadow-lg">
-          <div className="flex flex-col space-y-4">
-            <Link
-              href="#bots"
-              className="text-white/80 hover:text-primary transition-colors py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
+        <div className="md:hidden absolute top-full left-0 right-0 bg-dark/95 backdrop-blur-lg border-t border-white/10">
+          <div className="px-6 py-4 space-y-4">
+            <Link href="#bots" className="block text-white/80 hover:text-primary transition-colors">
               Bots
             </Link>
             <Link
               href="/dashboard"
-              className={`text-white/80 hover:text-primary transition-colors py-2 ${
+              className={`block text-white/80 hover:text-primary transition-colors ${
                 isActive('/dashboard') ? 'text-primary' : ''
               }`}
               onClick={() => setMobileMenuOpen(false)}
@@ -106,27 +109,19 @@ const Navigation: FC = () => {
             </Link>
             <Link
               href="/launchpad"
-              className={`text-white/80 hover:text-primary transition-colors py-2 ${
+              className={`block text-white/80 hover:text-primary transition-colors ${
                 isActive('/launchpad') ? 'text-primary' : ''
               }`}
               onClick={() => setMobileMenuOpen(false)}
             >
               Launchpad
             </Link>
-            <Link
-              href="#features"
-              className="text-white/80 hover:text-primary transition-colors py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
+            <a href="#features" className="block text-white/80 hover:text-primary transition-colors">
               Features
-            </Link>
-            <Link
-              href="#faq"
-              className="text-white/80 hover:text-primary transition-colors py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
+            </a>
+            <a href="#faq" className="block text-white/80 hover:text-primary transition-colors">
               FAQ
-            </Link>
+            </a>
           </div>
         </div>
       )}

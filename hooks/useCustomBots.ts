@@ -28,12 +28,17 @@ export interface CustomBot {
 }
 
 export function useCustomBots() {
-  const { publicKey } = useWallet();
+  const wallet = useWallet();
   const [customBots, setCustomBots] = useState<CustomBot[]>([]);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // Load custom bots from localStorage
-    if (typeof window !== 'undefined') {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    // Load custom bots from localStorage only on client
+    if (isClient && typeof window !== 'undefined') {
       const saved = localStorage.getItem('customBots');
       if (saved) {
         try {
@@ -43,9 +48,11 @@ export function useCustomBots() {
         }
       }
     }
-  }, []);
+  }, [isClient]);
 
   const addCustomBot = (bot: Omit<CustomBot, 'id' | 'createdAt'>) => {
+    if (!isClient) return null;
+    
     const newBot: CustomBot = {
       ...bot,
       id: `custom-${Date.now()}`,
@@ -63,6 +70,8 @@ export function useCustomBots() {
   };
 
   const removeCustomBot = (id: string) => {
+    if (!isClient) return;
+    
     const updatedBots = customBots.filter(bot => bot.id !== id);
     setCustomBots(updatedBots);
     
@@ -72,6 +81,8 @@ export function useCustomBots() {
   };
 
   const updateCustomBot = (id: string, updates: Partial<CustomBot>) => {
+    if (!isClient) return;
+    
     const updatedBots = customBots.map(bot => 
       bot.id === id ? { ...bot, ...updates } : bot
     );

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRealHistoricalData } from '@/lib/marketData/realDataService';
 import { getHistoricalData } from '@/lib/simulation/historicalDataService';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 /**
  * API-Route: /api/market
  * 
