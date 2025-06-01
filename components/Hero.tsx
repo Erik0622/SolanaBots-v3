@@ -5,14 +5,53 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Link from 'next/link';
 
+interface HeroClientContentProps {
+  connected: boolean;
+}
+
+const HeroClientContent: FC<HeroClientContentProps> = ({ connected }) => {
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+      {!connected ? (
+        <>
+          <div className="group">
+            <WalletMultiButton className="!bg-gradient-to-r !from-primary !to-secondary !text-black !font-bold !text-lg !px-8 !py-4 !rounded-xl !transition-all !duration-300 hover:!scale-105 hover:!shadow-2xl hover:!shadow-primary/50" />
+          </div>
+          <Link 
+            href="#bots" 
+            className="group relative px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/20 hover:border-primary/50 text-white font-semibold text-lg rounded-xl transition-all duration-300 hover:scale-105 backdrop-blur-sm"
+          >
+            <span className="relative z-10">Explore Bots</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          </Link>
+        </>
+      ) : (
+        <>
+          <Link 
+            href="/dashboard" 
+            className="bg-gradient-to-r from-primary to-secondary text-black font-bold text-lg px-8 py-4 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-primary/50"
+          >
+            Open Dashboard
+          </Link>
+          <Link 
+            href="/my-bots" 
+            className="group relative px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/20 hover:border-primary/50 text-white font-semibold text-lg rounded-xl transition-all duration-300 hover:scale-105 backdrop-blur-sm"
+          >
+            <span className="relative z-10">My Bots</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          </Link>
+        </>
+      )}
+    </div>
+  );
+};
+
 const Hero: FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isClient, setIsClient] = useState(false);
-  
-  const wallet = useWallet();
-  const connected = isClient ? wallet.connected : false;
-  
+  const wallet = useWallet(); // Call useWallet unconditionally
+
   useEffect(() => {
     setIsClient(true);
     setIsVisible(true);
@@ -84,39 +123,18 @@ const Hero: FC = () => {
             that work <span className="text-secondary font-semibold">24/7</span> on the fastest blockchain.
           </p>
           
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            {!connected ? (
-              <>
-                <div className="group">
-                  {isClient && <WalletMultiButton className="!bg-gradient-to-r !from-primary !to-secondary !text-black !font-bold !text-lg !px-8 !py-4 !rounded-xl !transition-all !duration-300 hover:!scale-105 hover:!shadow-2xl hover:!shadow-primary/50" />}
-                </div>
-                <Link 
-                  href="#bots" 
-                  className="group relative px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/20 hover:border-primary/50 text-white font-semibold text-lg rounded-xl transition-all duration-300 hover:scale-105 backdrop-blur-sm"
-                >
-                  <span className="relative z-10">Explore Bots</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link 
-                  href="/dashboard" 
-                  className="bg-gradient-to-r from-primary to-secondary text-black font-bold text-lg px-8 py-4 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-primary/50"
-                >
-                  Open Dashboard
-                </Link>
-                <Link 
-                  href="/my-bots" 
-                  className="group relative px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/20 hover:border-primary/50 text-white font-semibold text-lg rounded-xl transition-all duration-300 hover:scale-105 backdrop-blur-sm"
-                >
-                  <span className="relative z-10">My Bots</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </Link>
-              </>
-            )}
-          </div>
+          {isClient ? <HeroClientContent connected={wallet.connected} /> : (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+              {/* Placeholder for non-client render */}
+              <Link 
+                href="#bots" 
+                className="group relative px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/20 hover:border-primary/50 text-white font-semibold text-lg rounded-xl transition-all duration-300 hover:scale-105 backdrop-blur-sm"
+              >
+                <span className="relative z-10">Explore Bots</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </Link>
+            </div>
+          )}
           
           {/* Stats Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">

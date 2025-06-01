@@ -31,7 +31,14 @@ interface BotCardProps {
   showFavoriteButton?: boolean;
 }
 
-const BotCard: FC<BotCardProps> = ({
+interface BotCardClientContentProps extends BotCardProps {
+  wallet: ReturnType<typeof useWallet>;
+  isFavoriteInitial: boolean;
+  botStatusInitial: 'active' | 'paused';
+  riskPercentageInitial: number;
+}
+
+const BotCardClientContent: FC<BotCardClientContentProps> = ({
   id,
   name,
   description,
@@ -45,27 +52,27 @@ const BotCard: FC<BotCardProps> = ({
   riskManagement,
   baseRiskPerTrade,
   onRiskChange,
-  status = 'paused',
   profitToday = 0,
   profitWeek = 0,
   profitMonth = 0,
   onStatusChange = () => {},
-  showFavoriteButton = false
+  showFavoriteButton = false,
+  wallet,
+  isFavoriteInitial,
+  botStatusInitial,
+  riskPercentageInitial
 }) => {
-  const wallet = useWallet();
-  const { isBotFavorite, toggleFavorite } = useFavoriteBots();
+  const { isBotFavorite: isFavoriteCheck, toggleFavorite } = useFavoriteBots();
   const [performanceTimeframe, setPerformanceTimeframe] = useState<'7d' | '30d'>('7d');
-  const [riskPercentage, setRiskPercentage] = useState(5); // Default value
+  const [riskPercentage, setRiskPercentage] = useState(riskPercentageInitial);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [botStatus, setBotStatusState] = useState<'active' | 'paused'>('paused');
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [botStatus, setBotStatusState] = useState<'active' | 'paused'>(botStatusInitial);
+  const [isFavorite, setIsFavorite] = useState(isFavoriteInitial);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [enableRealAPI, setEnableRealAPI] = useState(true);
-  const [isClient, setIsClient] = useState(false);
   
-  // Load simulation data for this bot
   const { 
     simulation, 
     error: simulationError, 
@@ -74,40 +81,14 @@ const BotCard: FC<BotCardProps> = ({
     refreshSimulation
   } = useSimulation(id, false, enableRealAPI);
 
-  // Client-side hydration
   useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Animation on mount
-  useEffect(() => {
-    if (!isClient) return;
     const timer = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(timer);
-  }, [isClient]);
+  }, []);
 
-  // Initialize client-side only values
+  // Bot status polling
   useEffect(() => {
-    if (!isClient) return;
-    
-    // Load risk percentage from localStorage
-    const savedRisk = getBotRisk(id);
-    setRiskPercentage(savedRisk);
-    
-    // Load bot status from localStorage
-    const status = getBotStatus(id);
-    setBotStatusState(status?.isActive ? 'active' : 'paused');
-  }, [id, isClient]);
-
-  // Check if bot is favorite (client-side only)
-  useEffect(() => {
-    if (!isClient || !wallet.publicKey) return;
-    setIsFavorite(isBotFavorite(id));
-  }, [id, wallet.publicKey, isBotFavorite, isClient]);
-  
-  // Bot status polling (client-side only)
-  useEffect(() => {
-    if (!isClient || !wallet.connected || !wallet.publicKey) return;
+    if (!wallet.connected || !wallet.publicKey) return;
     
     let statusInterval: NodeJS.Timeout | undefined;
 
@@ -149,7 +130,12 @@ const BotCard: FC<BotCardProps> = ({
         clearInterval(statusInterval);
       }
     };
-  }, [wallet.connected, wallet.publicKey, id, isClient]);
+  }, [wallet.connected, wallet.publicKey, id]);
+
+  // Update isFavorite state if the prop changes (e.g. after initial client-side check)
+  useEffect(() => {
+    setIsFavorite(isFavoriteInitial);
+  }, [isFavoriteInitial]);
 
   const getBotTypeFromName = (name: string) => {
     const nameToType: Record<string, string> = {
@@ -164,8 +150,6 @@ const BotCard: FC<BotCardProps> = ({
   };
 
   const updateRiskPercentage = (newRisk: number) => {
-    if (!isClient) return;
-    
     setRiskPercentage(newRisk);
     saveBotRisk(id, newRisk);
     if (onRiskChange) {
@@ -174,7 +158,7 @@ const BotCard: FC<BotCardProps> = ({
   };
 
   const activateBot = async () => {
-    if (!isClient || !wallet.connected || !wallet.publicKey || !wallet.signTransaction) {
+    if (!wallet.connected || !wallet.publicKey || !wallet.signTransaction) {
       setError('Please connect your wallet first');
       return;
     }
@@ -229,14 +213,12 @@ const BotCard: FC<BotCardProps> = ({
   };
 
   const handleFavoriteToggle = () => {
-    if (!isClient) return;
     toggleFavorite(id);
     setIsFavorite(!isFavorite);
   };
 
-  // Sample data for performance chart
   const performanceData = simulation?.dailyData?.map((item, index) => ({
-    time: `${index * 4}:00`, // Convert to hour format for display
+    time: `${index * 4}:00`,
     value: item.value
   })) || [
     { time: '00:00', value: 100 },
@@ -247,17 +229,6 @@ const BotCard: FC<BotCardProps> = ({
     { time: '20:00', value: 107 },
     { time: '24:00', value: 110 }
   ];
-
-  // Show loading state during hydration
-  if (!isClient) {
-    return (
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 h-96">
-        <div className="flex items-center justify-center h-full">
-          <div className="loading-spinner"></div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div 
@@ -449,6 +420,44 @@ const BotCard: FC<BotCardProps> = ({
       )}
     </div>
   );
+};
+
+const BotCard: FC<BotCardProps> = (props) => {
+  const [isClient, setIsClient] = useState(false);
+  const wallet = useWallet();
+  // We need to call useFavoriteBots here to get its values to pass to client content
+  const { isBotFavorite } = useFavoriteBots(); 
+  
+  const [isFavoriteInitial, setIsFavoriteInitial] = useState(false);
+  const [botStatusInitial, setBotStatusInitial] = useState<'active' | 'paused'>('paused');
+  const [riskPercentageInitial, setRiskPercentageInitial] = useState(5);
+
+  useEffect(() => {
+    setIsClient(true);
+    if (typeof window !== 'undefined') {
+      // Now correctly use the hook instance to check favorite status
+      setIsFavoriteInitial(isBotFavorite(props.id)); 
+      
+      const status = getBotStatus(props.id);
+      setBotStatusInitial(status?.isActive ? 'active' : 'paused');
+      
+      const risk = getBotRisk(props.id);
+      setRiskPercentageInitial(risk);
+    }
+    // Add isBotFavorite to dependency array as its instance might change
+  }, [props.id, isBotFavorite]); 
+
+  if (!isClient) {
+    return (
+      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 h-96">
+        <div className="flex items-center justify-center h-full">
+          <div className="loading-spinner"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  return <BotCardClientContent {...props} wallet={wallet} isFavoriteInitial={isFavoriteInitial} botStatusInitial={botStatusInitial} riskPercentageInitial={riskPercentageInitial} />;
 };
 
 export default BotCard;
