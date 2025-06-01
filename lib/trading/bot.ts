@@ -1,11 +1,33 @@
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
-import { PrismaClient, Bot as PrismaBot } from '@prisma/client';
 import * as anchor from '@project-serum/anchor';
 import { AnchorProvider } from '@project-serum/anchor';
 import { VolumeTracker } from '@/bots/VolumeTracker';
 import { MomentumBot } from '@/bots/TrendSurfer';
 import { DipHunter } from '@/bots/ArbitrageFinder';
-import prisma, { getMockModeStatus } from '@/lib/prisma';
+
+// Importiere Prisma dynamisch für Build-Kompatibilität
+let prisma: any;
+let getMockModeStatus: any;
+
+try {
+  const prismaModule = require('@/lib/prisma');
+  prisma = prismaModule.default;
+  getMockModeStatus = prismaModule.getMockModeStatus;
+} catch (error) {
+  console.warn('Prisma nicht verfügbar während Build:', error);
+  prisma = null;
+  getMockModeStatus = () => false;
+}
+
+// Typ-Definition für Bot (als Interface statt Import)
+interface PrismaBot {
+  id: string;
+  isActive: boolean;
+  walletAddress: string;
+  strategyType: string;
+  riskPercentage: number;
+  name: string;
+}
 
 // Alchemy RPC URL für Solana Mainnet
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://solana-mainnet.g.alchemy.com/v2/ajXi9mI9_OF6a0Nfy6PZ-05JT29nTxFm';
@@ -16,51 +38,38 @@ const connection = new Connection(SOLANA_RPC_URL, {
   commitment: 'confirmed'
 });
 
-// Bot-Programm IDL importieren - mit try-catch um Fehler abzufangen
-let idl: any;
-try {
-  // Versuche verschiedene Pfade für die IDL-Datei
-  try {
-    idl = require('../../target/idl/trading_bot.json');
-  } catch (error) {
-    // Fallback für Build-Umgebung
-    idl = require('../../../target/idl/trading_bot.json');
-  }
-} catch (error) {
-  console.error('Fehler beim Laden des IDL:', error);
-  // Fallback-IDL, falls das echte nicht geladen werden kann
-  idl = {
-    version: "0.1.0",
-    name: "trading_bot",
-    instructions: [
-      {
-        name: "initializeBot",
-        accounts: [
-          { name: "bot", isMut: true, isSigner: false },
-          { name: "user", isMut: true, isSigner: true },
-          { name: "systemProgram", isMut: false, isSigner: false }
-        ],
-        args: [{ name: "botType", type: "string" }]
-      },
-      {
-        name: "activateBot",
-        accounts: [
-          { name: "bot", isMut: true, isSigner: false },
-          { name: "user", isMut: true, isSigner: true }
-        ],
-        args: []
-      },
-      {
-        name: "deactivateBot",
-        accounts: [
-          { name: "bot", isMut: true, isSigner: false },
-          { name: "user", isMut: true, isSigner: true }
-        ],
-        args: []
-      }
-    ]
-  };
-}
+// Fallback-IDL für Build-Kompatibilität
+const idl = {
+  version: "0.1.0",
+  name: "trading_bot",
+  instructions: [
+    {
+      name: "initializeBot",
+      accounts: [
+        { name: "bot", isMut: true, isSigner: false },
+        { name: "user", isMut: true, isSigner: true },
+        { name: "systemProgram", isMut: false, isSigner: false }
+      ],
+      args: [{ name: "botType", type: "string" }]
+    },
+    {
+      name: "activateBot",
+      accounts: [
+        { name: "bot", isMut: true, isSigner: false },
+        { name: "user", isMut: true, isSigner: true }
+      ],
+      args: []
+    },
+    {
+      name: "deactivateBot",
+      accounts: [
+        { name: "bot", isMut: true, isSigner: false },
+        { name: "user", isMut: true, isSigner: true }
+      ],
+      args: []
+    }
+  ]
+};
 
 const programId = new PublicKey(BOT_PROGRAM_ID);
 
