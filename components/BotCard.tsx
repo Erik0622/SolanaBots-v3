@@ -235,7 +235,10 @@ const BotCard: FC<BotCardProps> = ({
   };
 
   // Sample data for performance chart
-  const performanceData = simulation?.data || [
+  const performanceData = simulation?.dailyData?.map((item, index) => ({
+    time: `${index * 4}:00`, // Convert to hour format for display
+    value: item.value
+  })) || [
     { time: '00:00', value: 100 },
     { time: '04:00', value: 102 },
     { time: '08:00', value: 98 },
