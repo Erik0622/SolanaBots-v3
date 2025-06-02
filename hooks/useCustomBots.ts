@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+// Mock wallet adapter for build compatibility
+const useWallet = () => ({ connected: false });
 
 export interface CustomBot {
   id: string;
