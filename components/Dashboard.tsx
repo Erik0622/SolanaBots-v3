@@ -76,6 +76,7 @@ const Dashboard: FC = () => {
         clearInterval(botsListInterval);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, publicKey, timeframe]);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 export interface ToastProps {
   message: string;
@@ -12,6 +12,13 @@ export interface ToastProps {
 const Toast: React.FC<ToastProps> = ({ message, type, duration = 5000, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
+
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose();
+    }, 300);
+  }, [onClose]);
 
   useEffect(() => {
     // Animations-Timer für Eingang
@@ -26,14 +33,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, duration = 5000, onClose }
       clearTimeout(showTimer);
       clearTimeout(closeTimer);
     };
-  }, [duration]);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onClose();
-    }, 300);
-  };
+  }, [duration, handleClose]);
 
   const getIcon = () => {
     switch (type) {
