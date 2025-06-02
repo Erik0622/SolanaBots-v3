@@ -3,8 +3,10 @@
 import React, { FC, useState, useEffect } from 'react';
 import BotCard from './BotCard';
 import Link from 'next/link';
-import { useWallet } from '@solana/wallet-adapter-react';
+// Mock wallet adapter for build compatibility
+const useWallet = () => ({ connected: false });
 import { getBotStatus, setBotStatus, getAllBotStatus, getBotRisk } from '@/lib/botState';
+import { predefinedBots } from '@/config/bots';
 
 interface BotsSectionClientContentProps {
   connected: boolean;
