@@ -49,63 +49,541 @@ export default async function handler(
 }
 
 /**
- * Neue Bitquery-basierte Simulation mit echter Bitquery API
- * Verwendet die ECHTE Bitquery API für Solana-Daten
+ * NEUE 7-TAGE TAGESWEISE SIMULATION
+ * Jeden Tag neue Token-Auswahl basierend auf aktuellen Kriterien
  */
 async function simulateWithBitqueryData(
   botType: string, 
   tokenCount: number
 ): Promise<BitquerySimulationResult> {
   
-  console.log('🔍 Loading REAL Bitquery data for new Raydium tokens...');
+  console.log('🔍 Starting 7-day progressive simulation...');
   
   try {
-    // VERWENDE DIE ECHTE BITQUERY API
     const bitqueryAPI = new BitqueryAPI();
     
-    console.log('📡 Testing Bitquery API schema first...');
-    
-    // TESTE SCHEMA ZUERST
+    // Test API Connection
     const schemaWorking = await bitqueryAPI.testConnection();
-    console.log(`📊 Schema test result: ${schemaWorking}`);
-    
     if (!schemaWorking) {
-      throw new Error('Bitquery API Schema-Test fehlgeschlagen - API nicht erreichbar');
+      throw new Error('Bitquery API Schema-Test fehlgeschlagen');
     }
     
-    // DEBUG: Teste einfache Raydium-Abfrage
-    console.log('🐛 Running Raydium debug test...');
-    await bitqueryAPI.debugRaydiumData();
+    // RUN 7-DAY PROGRESSIVE SIMULATION
+    const simulationResult = await runSevenDayProgressiveSimulation(bitqueryAPI, botType, tokenCount);
     
-    console.log('📡 Using Bitquery API for real Solana token data...');
-    
-    // Hole echte neue Raydium-Token von Bitquery
-    const realTokens = await bitqueryAPI.getNewRaydiumMemecoins(tokenCount);
-    
-    if (realTokens.length === 0) {
-      throw new Error('Keine neuen Raydium-Token von Bitquery API gefunden');
-    }
-
-    console.log(`✅ Found ${realTokens.length} REAL Raydium tokens from Bitquery API`);
-
-    // Wähle beste Token für Bot-Strategie aus
-    const selectedTokens = selectTokensForBot(realTokens, botType, tokenCount);
-    
-    console.log(`🎯 Selected ${selectedTokens.length} REAL tokens for ${botType} strategy`);
-
-    // Simuliere Bot-Performance mit echten Token-Daten
-    const performance = await simulateRealBotPerformance(selectedTokens, botType);
-
     return {
-      ...performance,
-      tokens: selectedTokens,
+      ...simulationResult,
       dataSource: 'bitquery-api'
     };
     
   } catch (error) {
-    console.error('❌ Bitquery API failed:', error);
-    throw new Error(`Bitquery API Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+    console.error('❌ Simulation failed:', error);
+    throw new Error(`Simulation Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
   }
+}
+
+/**
+ * ECHTE 7-TAGE PROGRESSIVE SIMULATION
+ * Tag für Tag neue Token-Auswahl + echte Trading-Simulation
+ */
+async function runSevenDayProgressiveSimulation(
+  bitqueryAPI: BitqueryAPI,
+  botType: string,
+  maxTokensPerDay: number
+): Promise<{
+  profitPercentage: number;
+  tradeCount: number;
+  successRate: number;
+  dailyData: { date: string; value: number }[];
+  tokens: BitqueryToken[];
+}> {
+  
+  const startingCapital = 1000; // $1000 Startkapital
+  let currentCapital = startingCapital;
+  let totalTrades = 0;
+  let successfulTrades = 0;
+  
+  const dailyResults: { date: string; value: number }[] = [];
+  const allTokensUsed: BitqueryToken[] = [];
+  
+  // Portfolio-Tracking für offene Positionen
+  const openPositions = new Map<string, {
+    tokenAddress: string;
+    amount: number;
+    entryPrice: number;
+    entryTime: number;
+    stopLoss: number;
+    takeProfit: number;
+  }>();
+  
+  // SIMULATION: 7 Tage rückblickend
+  const simulationEndDate = new Date();
+  const simulationStartDate = new Date(simulationEndDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+  
+  console.log(`📅 Simulation Period: ${simulationStartDate.toISOString().split('T')[0]} bis ${simulationEndDate.toISOString().split('T')[0]}`);
+  
+  // TAG FÜR TAG SIMULATION
+  for (let day = 0; day < 7; day++) {
+    const currentDate = new Date(simulationStartDate.getTime() + day * 24 * 60 * 60 * 1000);
+    const dateString = currentDate.toISOString().split('T')[0];
+    
+    console.log(`\n📅 === SIMULATION TAG ${day + 1}: ${dateString} ===`);
+    console.log(`💰 Portfolio Wert zu Tagesbeginn: $${currentCapital.toFixed(2)}`);
+    
+    // SCHRITT 1: Token-Auswahl für diesen Tag
+    const dayTokens = await getEligibleTokensForDate(bitqueryAPI, currentDate, maxTokensPerDay);
+    console.log(`🎯 ${dayTokens.length} Token erfüllen Kriterien an Tag ${day + 1}`);
+    
+    if (dayTokens.length === 0) {
+      console.log(`⚠️  Keine Token verfügbar für Tag ${day + 1}`);
+      dailyResults.push({
+        date: dateString,
+        value: ((currentCapital - startingCapital) / startingCapital) * 100
+      });
+      continue;
+    }
+    
+    // SCHRITT 2: Preishistorie für diese Token laden
+    const tokenHistories = await loadTokenHistoriesForDate(bitqueryAPI, dayTokens, currentDate);
+    
+    // SCHRITT 3: Trading-Simulation für diesen Tag
+    const dayResult = await simulateTradingDay(
+      botType,
+      dayTokens,
+      tokenHistories,
+      currentCapital,
+      openPositions,
+      currentDate
+    );
+    
+    // SCHRITT 4: Portfolio aktualisieren
+    currentCapital = dayResult.endingCapital;
+    totalTrades += dayResult.tradesExecuted;
+    successfulTrades += dayResult.successfulTrades;
+    allTokensUsed.push(...dayTokens);
+    
+    // SCHRITT 5: Tagesperformance speichern
+    const dailyReturn = ((dayResult.endingCapital - startingCapital) / startingCapital) * 100;
+    dailyResults.push({
+      date: dateString,
+      value: dailyReturn
+    });
+    
+    console.log(`📊 Tag ${day + 1} Ergebnis:`);
+    console.log(`   Trades: ${dayResult.tradesExecuted} (${dayResult.successfulTrades} erfolgreich)`);
+    console.log(`   Portfolio Ende: $${dayResult.endingCapital.toFixed(2)}`);
+    console.log(`   Offene Positionen: ${openPositions.size}`);
+  }
+  
+  // FINALE ERGEBNISSE
+  const finalReturn = ((currentCapital - startingCapital) / startingCapital) * 100;
+  const successRate = totalTrades > 0 ? (successfulTrades / totalTrades) * 100 : 0;
+  
+  console.log(`\n🏁 === SIMULATION COMPLETE ===`);
+  console.log(`   Final Portfolio: $${currentCapital.toFixed(2)}`);
+  console.log(`   Total Return: ${finalReturn.toFixed(2)}%`);
+  console.log(`   Total Trades: ${totalTrades} (${successfulTrades} successful)`);
+  console.log(`   Success Rate: ${successRate.toFixed(1)}%`);
+  console.log(`   Tokens Used: ${allTokensUsed.length} unique tokens`);
+      
+      return {
+    profitPercentage: finalReturn,
+    tradeCount: totalTrades,
+    successRate,
+    dailyData: dailyResults,
+    tokens: allTokensUsed
+  };
+}
+
+/**
+ * Lädt Token die an einem bestimmten Tag die Kriterien erfüllten
+ */
+async function getEligibleTokensForDate(
+  bitqueryAPI: BitqueryAPI,
+  targetDate: Date,
+  maxTokens: number
+): Promise<BitqueryToken[]> {
+  
+  try {
+    // Token die AN DIESEM TAG:
+    // - < 24h alt waren
+    // - > 50k Market Cap hatten  
+    // - zu Raydium migriert waren
+    const tokens = await bitqueryAPI.getTokensEligibleAtDate(targetDate, {
+      maxAgeHours: 24,
+      minMarketCap: 50000,
+      migratedToRaydium: true
+    });
+    
+    // Bewerte und sortiere Token für Bot-Strategie
+    const scoredTokens = tokens
+      .map(token => ({ token, score: calculateTokenScore(token, 'volume-tracker') }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxTokens)
+      .map(item => item.token);
+    
+    return scoredTokens;
+    
+  } catch (error) {
+    console.error(`❌ Token-Auswahl für ${targetDate.toISOString().split('T')[0]} fehlgeschlagen:`, error);
+    return [];
+  }
+}
+
+/**
+ * Lädt echte Preishistorie für Token an einem bestimmten Tag
+ */
+async function loadTokenHistoriesForDate(
+  bitqueryAPI: BitqueryAPI,
+  tokens: BitqueryToken[],
+  targetDate: Date
+): Promise<Map<string, any[]>> {
+  
+  const histories = new Map<string, any[]>();
+  
+  for (const token of tokens) {
+    try {
+      // Lade 24h OHLCV-Daten für diesen Tag
+      const history = await bitqueryAPI.getTokenDayHistory(token.address, targetDate);
+      
+      if (history && history.length > 0) {
+        histories.set(token.address, history);
+        console.log(`📊 ${token.symbol}: ${history.length} Kerzen geladen`);
+      }
+    } catch (error) {
+      console.error(`❌ Historie für ${token.symbol} fehlgeschlagen:`, error);
+    }
+  }
+  
+  return histories;
+}
+
+/**
+ * ECHTE BOT-STRATEGIEN (aus botSimulator.ts)
+ * Verwendet echte Bitquery OHLCV-Daten statt vereinfachte Signale
+ */
+function getBotSignal(
+  botType: string, 
+  token: BitqueryToken, 
+  candle: any, 
+  history: any[],
+  currentIndex: number
+): 'BUY' | 'SELL' | 'HOLD' {
+  
+  // Konvertiere Bitquery-Format zu Standard OHLCV-Format
+  const data = history.map(h => ({
+    timestamp: h.timestamp,
+    open: h.open,
+    high: h.high,
+    low: h.low,
+    close: h.close,
+    volume: h.volume
+  }));
+  
+  // Füge aktuelle Kerze hinzu
+  data.push({
+    timestamp: candle.timestamp,
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
+    volume: candle.volume
+  });
+  
+  const index = data.length - 1;
+  
+  switch (botType) {
+    case 'volume-tracker':
+      return getVolumeTrackerSignal(data, index);
+    case 'trend-surfer':
+      return getTrendSurferSignal(data, index);
+    case 'dip-hunter':
+      return getDipHunterSignal(data, index);
+    default:
+      return 'HOLD';
+  }
+}
+
+/**
+ * VOLUME-TRACKER STRATEGIE (exakt aus botSimulator.ts)
+ */
+function getVolumeTrackerSignal(data: any[], index: number): 'BUY' | 'SELL' | 'HOLD' {
+  if (index < 5) return 'HOLD';
+
+  const relevantData = data.slice(index - 5, index + 1);
+  const averageVolume = relevantData.slice(0, 5).reduce((sum, d) => sum + d.volume, 0) / 5;
+  const currentVolume = relevantData[5].volume;
+  const currentClose = relevantData[5].close;
+  const prevClose = relevantData[4].close;
+
+  const volumeCondition = currentVolume > averageVolume * 1.5;
+  const priceCondition = currentClose >= prevClose;
+  
+  console.log(`VolumeTracker[${index}] | AvgVol: ${averageVolume.toFixed(2)}, CurrVol: ${currentVolume.toFixed(2)} -> VolCond: ${volumeCondition} | PrevClose: ${prevClose.toFixed(2)}, CurrClose: ${currentClose.toFixed(2)} -> PriceCond: ${priceCondition} | Result: ${volumeCondition && priceCondition}`);
+  
+  return (volumeCondition && priceCondition) ? 'BUY' : 'HOLD';
+}
+
+/**
+ * TREND-SURFER STRATEGIE (exakt aus botSimulator.ts)
+ */
+function getTrendSurferSignal(data: any[], index: number): 'BUY' | 'SELL' | 'HOLD' {
+  if (index < 6) return 'HOLD';
+  
+  const current = data[index];
+  const prev1 = data[index-1];
+  const prev2 = data[index-2];
+  const prev4 = data[index-4];
+
+  // Zwei grüne Kerzen in Folge
+  const risingCandles = 
+    current.close > current.open &&
+    prev1.close > prev1.open;
+    
+  // Ansteigendes Volumen - weniger strenge Bedingung
+  const risingVolume = 
+    current.volume > prev1.volume * 0.9;
+    
+  // 10% Preisanstieg in der letzten Stunde (4 Intervalle bei 15min)
+  const priceIncrease = prev4 ? (current.close - prev4.close) / prev4.close > 0.1 : false;
+    
+  console.log(`TrendSurfer[${index}] | RisingCandles: ${risingCandles} (Curr: ${current.open.toFixed(2)}-${current.close.toFixed(2)}, Prev1: ${prev1.open.toFixed(2)}-${prev1.close.toFixed(2)}) | RisingVol: ${risingVolume} (Curr: ${current.volume.toFixed(2)}, Prev1: ${prev1.volume.toFixed(2)}) | PriceInc: ${priceIncrease} (Curr: ${current.close.toFixed(2)}, Prev4: ${prev4 ? prev4.close.toFixed(2) : 'N/A'}) | Result: ${risingCandles && (risingVolume || priceIncrease)}`);
+
+  return (risingCandles && (risingVolume || priceIncrease)) ? 'BUY' : 'HOLD';
+}
+
+/**
+ * DIP-HUNTER STRATEGIE (exakt aus botSimulator.ts)
+ */
+function getDipHunterSignal(data: any[], index: number): 'BUY' | 'SELL' | 'HOLD' {
+  if (index < 10) return 'HOLD';
+  
+  // Preis ist um 30-60% vom lokalen Höchststand gefallen
+  const localHighPrice = Math.max(...data.slice(index - 10, index).map(d => d.high));
+  const currentPrice = data[index].close;
+  const dropPercentage = (localHighPrice - currentPrice) / localHighPrice;
+  
+  // Volumen bleibt stabil
+  const averageVolume = data.slice(index - 5, index).reduce((sum, d) => sum + d.volume, 0) / 5;
+  const stableVolume = data[index].volume >= averageVolume * 0.7;
+  
+  const dropCondition = dropPercentage >= 0.3 && dropPercentage <= 0.6;
+  const volumeCondition = stableVolume;
+  
+  console.log(`DipHunter[${index}] | LocalHigh: ${localHighPrice.toFixed(2)}, CurrPrice: ${currentPrice.toFixed(2)}, Drop: ${(dropPercentage * 100).toFixed(1)}% -> DropCond: ${dropCondition} | AvgVol: ${averageVolume.toFixed(2)}, CurrVol: ${data[index].volume.toFixed(2)} -> VolCond: ${volumeCondition} | Result: ${dropCondition && volumeCondition}`);
+  
+  return (dropCondition && volumeCondition) ? 'BUY' : 'HOLD';
+}
+
+/**
+ * VERKAUFS-LOGIK mit korrekten Profit/Loss-Levels
+ * ANGEPASST: 200% Take-Profit, 35% Stop-Loss
+ */
+function shouldSellPosition(
+  botType: string,
+  data: any[],
+  currentIndex: number,
+  entryPrice: number,
+  entryIndex: number
+): boolean {
+  
+  if (currentIndex === 0) return false;
+  
+  const currentPrice = data[currentIndex].close;
+  const holdingPeriods = currentIndex - entryIndex;
+  
+  // UNIVERSELLE PROFIT/LOSS-LEVELS (wie gewünscht)
+  const takeProfit = entryPrice * 3.0; // 200% Gewinn = 3x Preis
+  const stopLoss = entryPrice * 0.65; // 35% Verlust = 0.65x Preis
+  
+  // Take-Profit bei 200% Gewinn
+  if (currentPrice >= takeProfit) {
+    console.log(`💰 TAKE-PROFIT: ${currentPrice.toFixed(6)} >= ${takeProfit.toFixed(6)} (200% gain)`);
+    return true;
+  }
+  
+  // Stop-Loss bei 35% Verlust
+  if (currentPrice <= stopLoss) {
+    console.log(`🛑 STOP-LOSS: ${currentPrice.toFixed(6)} <= ${stopLoss.toFixed(6)} (35% loss)`);
+    return true;
+  }
+  
+  // Bot-spezifische Zusatz-Regeln
+  switch (botType) {
+    case 'volume-tracker':
+      // Nach 48 Perioden (12 Stunden) verkaufen
+      if (holdingPeriods >= 48) {
+        console.log(`⏰ TIME-EXIT (Volume-Tracker): ${holdingPeriods} periods`);
+        return true;
+      }
+      break;
+      
+    case 'trend-surfer':
+      // Trendumkehr - wenn eine rote Kerze auftritt (aber nur bei Gewinn)
+      const trendReversal = data[currentIndex].close < data[currentIndex].open;
+      if (trendReversal && currentPrice > entryPrice) {
+        console.log(`📉 TREND-REVERSAL: Red candle at profit`);
+        return true;
+      }
+      break;
+      
+    case 'dip-hunter':
+      // Maximale Haltezeit: 4 Perioden (1 Stunde)
+      if (holdingPeriods >= 4) {
+        console.log(`⏰ TIME-EXIT (Dip-Hunter): ${holdingPeriods} periods`);
+        return true;
+      }
+      break;
+  }
+  
+  return false;
+}
+
+/**
+ * VERBESSERTE Trading-Simulation mit korrekten Profit/Loss-Levels
+ */
+async function simulateTradingDay(
+  botType: string,
+  tokens: BitqueryToken[],
+  histories: Map<string, any[]>,
+  startingCapital: number,
+  openPositions: Map<string, any>,
+  tradingDate: Date
+): Promise<{
+  endingCapital: number;
+  tradesExecuted: number;
+  successfulTrades: number;
+}> {
+  
+  let currentCapital = startingCapital;
+  let tradesExecuted = 0;
+  let successfulTrades = 0;
+  
+  // Sammle alle Kerzen chronologisch
+  const allCandles: Array<{
+    tokenAddress: string;
+    timestamp: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    candleIndex: number; // Index in der Token-Historie
+  }> = [];
+  
+  // Sammle alle Kerzen von allen Token mit Index-Tracking
+  tokens.forEach(token => {
+    const history = histories.get(token.address);
+    if (history) {
+      history.forEach((candle, index) => {
+        allCandles.push({
+          tokenAddress: token.address,
+          candleIndex: index,
+          ...candle
+        });
+      });
+    }
+  });
+  
+  // Sortiere chronologisch
+  allCandles.sort((a, b) => a.timestamp - b.timestamp);
+  
+  console.log(`📊 Processing ${allCandles.length} candles for trading simulation`);
+  
+  // Trading-Simulation über alle Kerzen
+  for (const candle of allCandles) {
+    const token = tokens.find(t => t.address === candle.tokenAddress);
+    if (!token) continue;
+    
+    const tokenHistory = histories.get(token.address) || [];
+    const currentPosition = openPositions.get(token.address);
+    
+    // VERKAUFS-LOGIK prüfen (zuerst)
+    if (currentPosition) {
+      const shouldSell = shouldSellPosition(
+        botType,
+        tokenHistory,
+        candle.candleIndex,
+        currentPosition.entryPrice,
+        currentPosition.entryIndex
+      );
+      
+      // KORREKTE PROFIT/LOSS-LEVELS: 200% Take-Profit, 35% Stop-Loss
+      const takeProfit = currentPosition.entryPrice * 3.0; // 200% = 3x
+      const stopLoss = currentPosition.entryPrice * 0.65; // 35% loss = 0.65x
+      
+      if (shouldSell || candle.close <= stopLoss || candle.close >= takeProfit) {
+        // VERKAUFEN
+        const saleValue = currentPosition.amount * candle.close;
+        const fees = saleValue * 0.005; // 0.5% Fees
+        const netSaleValue = saleValue - fees;
+        const profit = netSaleValue - (currentPosition.amount * currentPosition.entryPrice);
+        
+        currentCapital += netSaleValue;
+        openPositions.delete(token.address);
+        tradesExecuted++;
+        
+        if (profit > 0) successfulTrades++;
+        
+        const reason = shouldSell ? 'Strategy Signal' : 
+                     candle.close <= stopLoss ? 'Stop-Loss (35%)' : 'Take-Profit (200%)';
+        
+        console.log(`🔴 SELL ${token.symbol} at $${candle.close.toFixed(6)} - Reason: ${reason} - Profit: $${profit.toFixed(2)}`);
+      }
+    }
+    
+    // KAUF-LOGIK prüfen
+    if (!openPositions.has(token.address) && currentCapital > 100) {
+      const signal = getBotSignal(botType, token, candle, tokenHistory, candle.candleIndex);
+      
+      if (signal === 'BUY') {
+        // KAUFEN
+        const riskPercent = 0.1; // 10% Risk per Trade (wie im Original)
+        const positionSize = Math.min(currentCapital * riskPercent, 300); // Max $300
+        const fees = positionSize * 0.005; // 0.5% Fees
+        const netPositionSize = positionSize - fees;
+        const amount = netPositionSize / candle.close;
+        
+        openPositions.set(token.address, {
+          tokenAddress: token.address,
+          amount,
+          entryPrice: candle.close,
+          entryTime: candle.timestamp,
+          entryIndex: candle.candleIndex,
+          stopLoss: candle.close * 0.65, // 35% Stop-Loss
+          takeProfit: candle.close * 3.0 // 200% Take-Profit
+        });
+        
+        currentCapital -= positionSize;
+        tradesExecuted++;
+        
+        console.log(`🟢 BUY ${token.symbol} at $${candle.close.toFixed(6)} - Size: $${positionSize.toFixed(2)} (TP: 200%, SL: 35%)`);
+      }
+    }
+  }
+  
+  // Berechne Wert der offenen Positionen
+  let openPositionsValue = 0;
+  for (const [tokenAddress, position] of openPositions.entries()) {
+    // Finde letzten Preis für diesen Token
+    const lastCandle = allCandles
+      .filter(c => c.tokenAddress === tokenAddress)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    
+    if (lastCandle) {
+      openPositionsValue += position.amount * lastCandle.close;
+    }
+  }
+  
+  const totalCapital = currentCapital + openPositionsValue;
+  
+  console.log(`📊 Day Result: Trades: ${tradesExecuted}, Success: ${successfulTrades}, Cash: $${currentCapital.toFixed(2)}, Positions: $${openPositionsValue.toFixed(2)}, Total: $${totalCapital.toFixed(2)}`);
+  
+  return {
+    endingCapital: totalCapital,
+    tradesExecuted,
+    successfulTrades
+  };
 }
 
 /**
@@ -130,6 +608,7 @@ function selectTokensForBot(
 
 /**
  * Bewertet Token für spezifische Bot-Strategien
+ * ERWEITERT: Nutzt neue Bitquery-Daten (Buy/Sell-Volume, Trader-Counts, etc.)
  */
 function calculateTokenScore(token: BitqueryToken, botType: string): number {
   let score = 0;
@@ -138,29 +617,66 @@ function calculateTokenScore(token: BitqueryToken, botType: string): number {
   score += Math.min(token.marketCap / 100000, 5); // Max 5 Punkte für MCap
   score += Math.min(token.volume24h / 50000, 3); // Max 3 Punkte für Volume
   
-  // Bot-spezifische Bewertung
+  // NEUE FAKTOREN basierend auf erweiterten Bitquery-Daten
+  const buyVol = token.buyVolume || 0;
+  const sellVol = token.sellVolume || 0;
+  const traders = token.tradersCount || 1;
+  const buys = token.tradeStats?.buys || 0;
+  const sells = token.tradeStats?.sells || 0;
+  const avgTradeSize = token.tradeStats?.avgTradeSize || 0;
+  const liquidityUSD = token.liquidityUSD || 0;
+  
+  console.log(`📊 Scoring ${token.symbol} for ${botType}:`);
+  console.log(`   Buy Vol: $${buyVol.toLocaleString()}, Sell Vol: $${sellVol.toLocaleString()}`);
+  console.log(`   Traders: ${traders}, Buys: ${buys}, Sells: ${sells}`);
+  console.log(`   Avg Trade Size: $${avgTradeSize.toLocaleString()}, Liquidity: $${liquidityUSD.toLocaleString()}`);
+  
+  // Bot-spezifische Bewertung mit erweiterten Daten
   switch (botType) {
     case 'volume-tracker':
-      // Volume-Tracker mag hohe Volumes und junge Token
-      score += Math.min(token.volume24h / 20000, 5);
-      score += token.age < 2 ? 3 : 1; // Bonus für sehr junge Token
+      // Volume-Tracker: Fokus auf Buy-Volume und Trader-Aktivität
+      score += Math.min(buyVol / 25000, 8); // Max 8 Punkte für Buy-Volume
+      score += Math.min(traders / 10, 4); // Max 4 Punkte für Trader-Count
+      score += buys > sells ? 3 : 0; // Bonus für mehr Käufe als Verkäufe
+      score += avgTradeSize > 1000 ? 2 : 0; // Bonus für große durchschnittliche Trades
+      score += token.age && token.age < 2 ? 3 : 1; // Bonus für sehr junge Token
+      console.log(`   Volume-Tracker Score: ${score.toFixed(1)} (buy-focused)`);
       break;
       
     case 'trend-surfer':
-      // Trend-Surfer mag mittlere Volatilität
+      // Trend-Surfer: Ausgewogenes Buy/Sell-Verhältnis und mittlere Volatilität
+      const buyToSellRatio = sellVol > 0 ? buyVol / sellVol : 1;
+      const balanceScore = buyToSellRatio > 0.5 && buyToSellRatio < 2 ? 4 : 1; // Ausgewogenes Verhältnis
+      score += balanceScore;
+      
       const volatility = token.volatility || calculateVolatility(token.priceHistory);
-      score += volatility > 20 && volatility < 80 ? 4 : 1;
+      score += volatility > 20 && volatility < 80 ? 4 : 1; // Mittlere Volatilität
+      score += Math.min(liquidityUSD / 100000, 3); // Liquiditäts-Bonus
       score += token.marketCap > 100000 ? 2 : 0; // Stabilere Token
+      console.log(`   Trend-Surfer Score: ${score.toFixed(1)} (balance-focused, ratio: ${buyToSellRatio.toFixed(2)})`);
       break;
       
     case 'dip-hunter':
-      // Dip-Hunter mag volatile, günstige Token
+      // Dip-Hunter: Fokus auf Sell-Pressure und Volatilität
+      const sellPressure = buyVol > 0 ? sellVol / buyVol : 1;
+      score += sellPressure > 1.2 ? 5 : 0; // Bonus für Sell-Pressure (Dip-Opportunity)
+      
       const recentDip = hasRecentDip(token.priceHistory);
-      score += recentDip ? 5 : 0;
+      score += recentDip ? 5 : 0; // Dip-Bonus
+      
+      const highVolatility = token.volatility || calculateVolatility(token.priceHistory);
+      score += highVolatility > 40 ? 4 : 1; // Hohe Volatilität bevorzugt
       score += token.marketCap < 200000 ? 3 : 1; // Kleinere MCaps
+      score += avgTradeSize > 500 ? 2 : 0; // Signifikante Trade-Größen
+      console.log(`   Dip-Hunter Score: ${score.toFixed(1)} (dip-focused, sell pressure: ${sellPressure.toFixed(2)})`);
+      break;
+      
+    default:
+      score += 5; // Standard-Score
       break;
   }
   
+  console.log(`   Final Score: ${score.toFixed(1)}`);
   return score;
 }
 
@@ -287,6 +803,7 @@ async function simulateRealBotPerformance(
 
 /**
  * Generiert Standard-Performance für Demo-Zwecke
+ * OHNE MATH.RANDOM - NUR DETERMINISTISCHE WERTE
  */
 function generateStandardDailyData(): { date: string; value: number }[] {
   const dailyData = [];
@@ -294,7 +811,9 @@ function generateStandardDailyData(): { date: string; value: number }[] {
   
   for (let i = daysBack - 1; i >= 0; i--) {
     const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const dailyReturn = 0.5 + Math.random() * 2; // 0.5% - 2.5% täglich
+    // DETERMINISTISCHE Berechnung statt Math.random()
+    const dayFactor = (7 - i) / 7; // 0.14 bis 1.0
+    const dailyReturn = 0.5 + (dayFactor * 2); // 0.64% bis 2.5% täglich (linear steigend)
     
     dailyData.push({
       date,
@@ -307,6 +826,7 @@ function generateStandardDailyData(): { date: string; value: number }[] {
 
 /**
  * Berechnet Performance basierend auf echten Token-Eigenschaften (NICHT auf Mock-Preisdaten)
+ * ANGEPASST: 30% Risiko pro Trade, DETERMINISTISCHE 7-Tage-Simulation (KEIN MATH.RANDOM)
  */
 function calculateRealTokenPerformance(
   token: BitqueryToken, 
@@ -318,7 +838,7 @@ function calculateRealTokenPerformance(
   dailyData: { date: string; return: number }[];
 } {
   
-  console.log(`🎯 Calculating performance for ${token.symbol} with strategy ${botType}`);
+  console.log(`🎯 Calculating performance for ${token.symbol} with strategy ${botType} (30% risk per trade)`);
   
   // Verwende echte Token-Eigenschaften für Simulation
   const marketCapFactor = Math.min(token.marketCap / 50000, 5); // MCap-basierte Performance (max 5x)
@@ -328,50 +848,72 @@ function calculateRealTokenPerformance(
   
   console.log(`   Factors: MCap=${marketCapFactor.toFixed(2)}, Volume=${volumeFactor.toFixed(2)}, Age=${ageFactor.toFixed(2)}, Volatility=${volatilityFactor.toFixed(2)}`);
   
-  let baseTrades = 0;
+  let dailyTrades = 0;
   let baseSuccessRate = 0;
-  let baseProfit = 0;
+  let profitPerTrade = 0;
+  const riskPerTrade = 30; // 30% Risiko pro Trade
   
-  // Bot-spezifische REALISTISCHE Performance-Berechnung
+  // Bot-spezifische REALISTISCHE Performance-Berechnung mit 30% Risiko
   switch (botType) {
     case 'volume-tracker':
-      // Volume-Tracker profitiert von hohem Volume und jungen Token
-      baseTrades = Math.floor(volumeFactor * ageFactor * 8) + 5; // Min 5 Trades
-      baseSuccessRate = Math.min(0.6 + (volumeFactor * 0.05) + (ageFactor * 0.05), 0.85); // Max 85%
-      baseProfit = (marketCapFactor + volumeFactor + ageFactor) * 1.8; // Realistischer
+      // Volume-Tracker: Häufige kleine Trades
+      dailyTrades = (volumeFactor * ageFactor * 2) + 1; // 1-10 Trades pro Tag
+      baseSuccessRate = Math.min(0.55 + (volumeFactor * 0.03) + (ageFactor * 0.03), 0.75); // Max 75%
+      profitPerTrade = riskPerTrade * (0.8 + (volatilityFactor * 0.2)); // 24-42% bei Win
       break;
       
     case 'trend-surfer':
-      // Trend-Surfer mag mittlere Volatilität und stabile Token
-      baseTrades = Math.floor(volatilityFactor * marketCapFactor * 6) + 3; // Min 3 Trades
-      baseSuccessRate = Math.min(0.55 + (marketCapFactor * 0.03) + (volatilityFactor * 0.02), 0.80); // Max 80%
-      baseProfit = (marketCapFactor + volatilityFactor) * 2.2;
+      // Trend-Surfer: Mittlere Frequenz, mittleres Risiko
+      dailyTrades = (volatilityFactor * marketCapFactor * 1.5) + 0.5; // 0.5-7 Trades pro Tag
+      baseSuccessRate = Math.min(0.50 + (marketCapFactor * 0.02) + (volatilityFactor * 0.02), 0.70); // Max 70%
+      profitPerTrade = riskPerTrade * (0.6 + (marketCapFactor * 0.3)); // 18-39% bei Win
       break;
       
     case 'dip-hunter':
-      // Dip-Hunter mag volatile, junge Token
-      baseTrades = Math.floor(ageFactor * volatilityFactor * 7) + 4; // Min 4 Trades
-      baseSuccessRate = Math.min(0.5 + (ageFactor * 0.08) + (volatilityFactor * 0.03), 0.75); // Max 75%
-      baseProfit = (ageFactor + volatilityFactor + volumeFactor) * 2.5;
+      // Dip-Hunter: Seltene aber große Opportunities
+      dailyTrades = (ageFactor * volatilityFactor * 1.2) + 0.3; // 0.3-8 Trades pro Tag
+      baseSuccessRate = Math.min(0.45 + (ageFactor * 0.05) + (volatilityFactor * 0.02), 0.65); // Max 65%
+      profitPerTrade = riskPerTrade * (1.0 + (ageFactor * 0.4)); // 30-66% bei Win
       break;
       
     default:
-      baseTrades = 10;
+      dailyTrades = 2;
       baseSuccessRate = 0.6;
-      baseProfit = 8;
+      profitPerTrade = riskPerTrade * 0.8; // 24%
   }
   
-  const successful = Math.floor(baseTrades * baseSuccessRate);
+  // Realistische 7-Tage-Simulation
+  const totalTrades = Math.floor(dailyTrades * 7); // 7 Tage Laufzeit
+  const successful = Math.floor(totalTrades * baseSuccessRate);
+  const failed = totalTrades - successful;
   
-  console.log(`   Calculated: ${baseTrades} trades, ${successful} successful (${(baseSuccessRate * 100).toFixed(1)}%), ${baseProfit.toFixed(2)}% profit`);
+  // Kelly-Criterion basierte Gewinn/Verlust-Rechnung
+  const totalProfit = (successful * profitPerTrade) - (failed * riskPerTrade);
   
-  // Generiere tägliche Performance basierend auf echten Token-Eigenschaften
+  console.log(`   7-Day Simulation: ${totalTrades} trades total (${(dailyTrades).toFixed(1)}/day)`);
+  console.log(`   Wins: ${successful} (${(baseSuccessRate * 100).toFixed(1)}%), Profit per win: ${profitPerTrade.toFixed(1)}%`);
+  console.log(`   Losses: ${failed}, Loss per trade: ${riskPerTrade}%`);
+  console.log(`   Net 7-day return: ${totalProfit.toFixed(2)}%`);
+  
+  // Generiere tägliche Performance für 7 Tage - DETERMINISTISCHE BERECHNUNG
   const dailyData = [];
-  const daysBack = 7;
+  let cumulativeReturn = 0;
   
-  for (let i = daysBack - 1; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const dailyReturn = (baseProfit / daysBack) * (0.7 + Math.random() * 0.6); // Varianz basierend auf echten Eigenschaften
+  for (let day = 0; day < 7; day++) {
+    const date = new Date(Date.now() - (6 - day) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    // DETERMINISTISCHE tägliche Trades basierend auf Token-Eigenschaften
+    const dayProgress = day / 6; // 0 bis 1
+    const volatilityImpact = (volatilityFactor - 1) * 0.2; // -0.2 bis +0.4
+    const tradesThisDay = Math.floor(dailyTrades * (0.8 + dayProgress * 0.4 + volatilityImpact)); // Deterministische Varianz
+    
+    // DETERMINISTISCHE Wins basierend auf Bot-Performance
+    const daySuccessRate = baseSuccessRate * (0.8 + dayProgress * 0.4); // Performance verbessert sich über Zeit
+    const winsThisDay = Math.floor(tradesThisDay * daySuccessRate);
+    const lossesThisDay = tradesThisDay - winsThisDay;
+    
+    const dailyReturn = (winsThisDay * profitPerTrade) - (lossesThisDay * riskPerTrade);
+    cumulativeReturn += dailyReturn;
     
     dailyData.push({
       date,
@@ -380,9 +922,9 @@ function calculateRealTokenPerformance(
   }
   
   return {
-    trades: baseTrades,
+    trades: totalTrades,
     successful,
-    profit: baseProfit,
+    profit: totalProfit,
     dailyData
   };
 } 

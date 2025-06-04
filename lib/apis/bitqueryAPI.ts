@@ -19,6 +19,22 @@ export interface BitqueryToken {
   dexId?: string;
   pairAddress?: string;
   liquidity?: number;
+  // NEUE BITQUERY DATEN basierend auf verfügbaren APIs
+  tradersCount?: number; // Anzahl unique Trader
+  buyVolume?: number; // Nur Buy-Volume
+  sellVolume?: number; // Nur Sell-Volume
+  liquidityUSD?: number; // Pool-Liquidität in USD
+  dexInfo?: {
+    protocolFamily: string;
+    protocolName: string;
+    programAddress: string;
+  };
+  tradeStats?: {
+    buys: number;
+    sells: number;
+    makers: number;
+    avgTradeSize: number;
+  };
 }
 
 export interface BitqueryPriceData {
@@ -113,14 +129,15 @@ export class BitqueryAPI {
 
   /**
    * ECHTE Bitquery API für neue Raydium-Token <24h - KEINE MOCK-DATEN!
+   * ERWEITERT: Mit Buy/Sell-Volume, Trader-Counts, Liquiditätsdaten
    */
   private async getBitqueryTokens(limit: number): Promise<BitqueryToken[]> {
     // ENTFERNE ZEITFILTER FÜR DEBUGGING
-    console.log('🐛 DEBUG: Entferne Zeitfilter und vereinfache Query für bessere Token-Erkennung...');
+    console.log('🐛 DEBUG: Verwende erweiterte Bitquery-Datenfelder (Buy/Sell-Volume, Trader-Counts, etc.)...');
     
-    // STARK VEREINFACHTE QUERY für Debugging
+    // ERWEITERTE QUERY mit mehr verfügbaren Bitquery-Daten
     const query = `
-      query SimpleRaydiumTokens {
+      query EnhancedRaydiumTokens {
         Solana {
           DEXTradeByTokens(
             where: {
@@ -143,21 +160,33 @@ export class BitqueryAPI {
               Dex {
                 ProtocolName
                 ProtocolFamily
+                ProgramAddress
               }
               PriceInUSD
               AmountInUSD
+              Side {
+                Type
+                AmountInUSD
+              }
             }
             Block {
               Time
             }
+            # ERWEITERTE AGGREGATIONS-DATEN
             count: count
+            uniqueTraders: count(distinct: Transaction_Signer)
+            buyVolume: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: buy}}}})
+            sellVolume: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: sell}}}})
+            buyTrades: count(if: {Trade: {Side: {Type: {is: buy}}}})
+            sellTrades: count(if: {Trade: {Side: {Type: {is: sell}}}})
+            makers: count(distinct: Transaction_Signer)
           }
         }
       }
     `;
 
     try {
-      console.log(`🔍 Suche nach ECHTEN Raydium-Token (vereinfachte Query)...`);
+      console.log(`🔍 Suche nach ECHTEN Raydium-Token mit erweiterten Daten...`);
       await this.handleRateLimit();
       
       const response = await this.executeQuery(query);
@@ -169,7 +198,7 @@ export class BitqueryAPI {
       }
 
       const trades = response.data.Solana.DEXTradeByTokens;
-      console.log(`📊 ${trades.length} echte Bitquery-Trades erhalten`);
+      console.log(`📊 ${trades.length} erweiterte Bitquery-Token-Daten erhalten`);
       
       if (trades.length === 0) {
         console.error('❌ KEINE TRADES: Bitquery API hat keine Raydium-Trades gefunden');
@@ -178,7 +207,7 @@ export class BitqueryAPI {
 
       const tokenMap = new Map<string, any>();
 
-      // Sammle alle einzigartigen Token ohne Filter
+      // Sammle alle Token mit erweiterten Daten
       trades.forEach((tradeGroup: any, index: number) => {
         try {
           const address = tradeGroup.Trade?.Currency?.MintAddress;
@@ -187,7 +216,15 @@ export class BitqueryAPI {
           const blockTime = tradeGroup.Block?.Time;
           const amountUSD = parseFloat(tradeGroup.Trade?.AmountInUSD) || 0;
           const priceUSD = parseFloat(tradeGroup.Trade?.PriceInUSD) || 0;
+          
+          // ERWEITERTE DATEN von Bitquery-Aggregationen
           const tradeCount = tradeGroup.count || 1;
+          const uniqueTraders = tradeGroup.uniqueTraders || 1;
+          const buyVolume = parseFloat(tradeGroup.buyVolume) || 0;
+          const sellVolume = parseFloat(tradeGroup.sellVolume) || 0;
+          const buyTrades = tradeGroup.buyTrades || 0;
+          const sellTrades = tradeGroup.sellTrades || 0;
+          const makers = tradeGroup.makers || 1;
           
           if (!address || !blockTime) {
             return; // Skip ohne Warning für cleane Logs
@@ -215,7 +252,19 @@ export class BitqueryAPI {
               totalVolume: 0,
               totalTrades: 0,
               latestPrice: 0,
-              dexProtocols: new Set()
+              dexProtocols: new Set(),
+              // ERWEITERTE DATEN
+              uniqueTraders: 0,
+              buyVolume: 0,
+              sellVolume: 0,
+              buyTrades: 0,
+              sellTrades: 0,
+              makers: 0,
+              dexInfo: {
+                protocolFamily: tradeGroup.Trade?.Dex?.ProtocolFamily || 'Raydium',
+                protocolName: tradeGroup.Trade?.Dex?.ProtocolName || 'Unknown',
+                programAddress: tradeGroup.Trade?.Dex?.ProgramAddress || ''
+              }
             });
           }
           
@@ -225,6 +274,14 @@ export class BitqueryAPI {
           token.totalTrades += tradeCount;
           token.latestPrice = priceUSD;
           token.dexProtocols.add(tradeGroup.Trade?.Dex?.ProtocolName);
+          
+          // AKKUMULIERE ERWEITERTE DATEN
+          token.uniqueTraders += uniqueTraders;
+          token.buyVolume += buyVolume;
+          token.sellVolume += sellVolume;
+          token.buyTrades += buyTrades;
+          token.sellTrades += sellTrades;
+          token.makers += makers;
           
           // Update Zeitfenster
           const tradeTime = new Date(blockTime).getTime();
@@ -242,30 +299,41 @@ export class BitqueryAPI {
         }
       });
 
-      console.log(`🔍 ${tokenMap.size} eindeutige Raydium-Token gefunden, erstelle Token-Liste...`);
+      console.log(`🔍 ${tokenMap.size} Token mit erweiterten Bitquery-Daten gefunden...`);
 
       const filteredTokens: BitqueryToken[] = [];
       
-      // MINIMALE FILTER - nur um gültige Token zu gewährleisten
+      // MINIMALE FILTER mit erweiterten Daten-Validierung
       for (const [address, tokenData] of tokenMap.entries()) {
         try {
           const firstTradeTime = new Date(tokenData.firstTradeTime).getTime();
           const ageHours = (Date.now() - firstTradeTime) / (1000 * 60 * 60);
           const estimatedMarketCap = Math.max(tokenData.totalVolume * 5, 1000); // Sehr konservativ
           const volume24h = tokenData.totalVolume;
+          const buyVol = tokenData.buyVolume || 0;
+          const sellVol = tokenData.sellVolume || 0;
+          const traders = tokenData.uniqueTraders || 1;
           
-          console.log(`🔍 Token ${tokenData.symbol}: MCap ~$${estimatedMarketCap.toLocaleString()}, Volume: $${volume24h.toLocaleString()}, Age: ${ageHours.toFixed(1)}h, Trades: ${tokenData.totalTrades}`);
+          console.log(`🔍 Token ${tokenData.symbol}:`);
+          console.log(`   MCap: ~$${estimatedMarketCap.toLocaleString()}, Volume: $${volume24h.toLocaleString()}`);
+          console.log(`   Buy Vol: $${buyVol.toLocaleString()}, Sell Vol: $${sellVol.toLocaleString()}`);
+          console.log(`   Traders: ${traders}, Trades: ${tokenData.totalTrades}, Age: ${ageHours.toFixed(1)}h`);
 
-          // MINIMALE FILTER: Nur grundlegende Validierung
+          // ERWEITERTE FILTER für bessere Token-Qualität
+          const buyToSellRatio = sellVol > 0 ? buyVol / sellVol : 1;
+          const avgTradeSize = volume24h / Math.max(tokenData.totalTrades, 1);
+          const isQualityToken = traders >= 2 && tokenData.totalTrades >= 3 && volume24h >= 500;
+          
           if (
             tokenData.latestPrice > 0 &&
             tokenData.totalTrades >= 1 &&
-            volume24h >= 100 // Nur $100 Mindestvolume
+            volume24h >= 100 && // Nur $100 Mindestvolume
+            isQualityToken // Qualitäts-Check
           ) {
-            console.log(`✅ Token ${tokenData.symbol} QUALIFIZIERT`);
+            console.log(`✅ Token ${tokenData.symbol} QUALIFIZIERT (Quality Token)`);
             
             try {
-              // Erstelle einfache Preishistorie
+              // Erstelle Preishistorie
               const priceHistory = this.generatePriceHistoryFromTrades(tokenData.trades, firstTradeTime);
               
               if (priceHistory.length === 0) {
@@ -295,10 +363,22 @@ export class BitqueryAPI {
                 priceHistory,
                 volatility,
                 priceChange24h,
-                priceUsd: tokenData.latestPrice
+                priceUsd: tokenData.latestPrice,
+                // ERWEITERTE BITQUERY-DATEN
+                tradersCount: traders,
+                buyVolume: buyVol,
+                sellVolume: sellVol,
+                liquidityUSD: (buyVol + sellVol) * 2, // Schätzung der Liquidität
+                dexInfo: tokenData.dexInfo,
+                tradeStats: {
+                  buys: tokenData.buyTrades,
+                  sells: tokenData.sellTrades,
+                  makers: tokenData.makers,
+                  avgTradeSize: avgTradeSize
+                }
               });
 
-              console.log(`✅ Token ${tokenData.symbol} mit ${priceHistory.length} Candles hinzugefügt`);
+              console.log(`✅ Token ${tokenData.symbol} mit erweiterten Daten und ${priceHistory.length} Candles hinzugefügt`);
 
               // Begrenze auf gewünschte Anzahl
               if (filteredTokens.length >= limit) {
@@ -311,7 +391,7 @@ export class BitqueryAPI {
               continue;
             }
           } else {
-            console.log(`❌ Token ${tokenData.symbol} nicht qualifiziert: Preis=${tokenData.latestPrice}, Trades=${tokenData.totalTrades}, Volume=$${volume24h}`);
+            console.log(`❌ Token ${tokenData.symbol} nicht qualifiziert: Preis=${tokenData.latestPrice}, Trades=${tokenData.totalTrades}, Volume=$${volume24h}, Quality=${isQualityToken}`);
           }
         } catch (tokenError) {
           console.error(`❌ Fehler beim Verarbeiten von Token ${address}:`, tokenError);
@@ -319,18 +399,18 @@ export class BitqueryAPI {
         }
       }
 
-      console.log(`🎯 ERGEBNIS: ${filteredTokens.length} Raydium-Token mit minimalen Filtern gefunden`);
+      console.log(`🎯 ERGEBNIS: ${filteredTokens.length} Raydium-Token mit erweiterten Bitquery-Daten`);
       
       if (filteredTokens.length === 0) {
-        console.error('❌ KEINE QUALIFIZIERTEN TOKEN: Selbst mit minimalen Filtern keine Token gefunden');
+        console.error('❌ KEINE QUALIFIZIERTEN TOKEN: Selbst mit erweiterten Daten keine Token gefunden');
         console.error('Das deutet auf ein API-Problem hin - keine echten Raydium-Daten verfügbar');
-        throw new Error('Keine Raydium-Token erfüllen selbst minimale Anforderungen - API-Problem vermutet');
+        throw new Error('Keine Raydium-Token erfüllen erweiterte Qualitätsanforderungen - API-Problem vermutet');
       }
 
       return filteredTokens;
 
     } catch (error) {
-      console.error('❌ BITQUERY TOKEN DISCOVERY FEHLGESCHLAGEN:', error);
+      console.error('❌ BITQUERY ERWEITERTE TOKEN DISCOVERY FEHLGESCHLAGEN:', error);
       
       if (error instanceof Error) {
         console.error('Error Details:', {
@@ -339,7 +419,7 @@ export class BitqueryAPI {
         });
       }
       
-      throw new Error(`Bitquery neue Token Discovery fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+      throw new Error(`Bitquery erweiterte Token Discovery fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   }
 
@@ -944,5 +1024,303 @@ export class BitqueryAPI {
     }
     
     return candles;
+  }
+
+  /**
+   * NEUE METHODE: Findet Token die an einem bestimmten Tag die Kriterien erfüllten
+   * Für tagesweise progressive Simulation
+   */
+  async getTokensEligibleAtDate(
+    targetDate: Date,
+    criteria: {
+      maxAgeHours: number;
+      minMarketCap: number;
+      migratedToRaydium: boolean;
+    }
+  ): Promise<BitqueryToken[]> {
+    
+    console.log(`🔍 Searching for tokens eligible on ${targetDate.toISOString().split('T')[0]}`);
+    console.log(`   Criteria: <${criteria.maxAgeHours}h old, >$${criteria.minMarketCap} MCap, Raydium: ${criteria.migratedToRaydium}`);
+    
+    const targetDateStr = targetDate.toISOString();
+    const maxAgeDateStr = new Date(targetDate.getTime() - criteria.maxAgeHours * 60 * 60 * 1000).toISOString();
+    
+    const query = `
+      query TokensEligibleAtDate {
+        Solana {
+          DEXTradeByTokens(
+            where: {
+              Block: { 
+                Time: { 
+                  between: ["${targetDateStr.split('T')[0]}T00:00:00Z", "${targetDateStr.split('T')[0]}T23:59:59Z"]
+                }
+              }
+              Trade: {
+                Dex: { 
+                  ProtocolFamily: { in: ["Raydium"] }
+                }
+                AmountInUSD: { gt: 100 } # Mindest-Trade-Größe
+              }
+              Transaction: { Result: { Success: true } }
+            }
+            orderBy: { descending: count }
+            limit: { count: 50 }
+          ) {
+            Trade {
+              Currency {
+                MintAddress
+                Symbol
+                Name
+              }
+              Dex {
+                ProtocolName
+                ProtocolFamily
+                ProgramAddress
+              }
+            }
+            Block {
+              Time
+            }
+            count: count
+            uniqueTraders: count(distinct: Transaction_Signer)
+            buyVolume: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: buy}}}})
+            sellVolume: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: sell}}}})
+            totalVolume: sum(of: Trade_AmountInUSD)
+            avgPrice: avg(of: Trade_PriceInUSD)
+            buyTrades: count(if: {Trade: {Side: {Type: {is: buy}}}})
+            sellTrades: count(if: {Trade: {Side: {Type: {is: sell}}}})
+          }
+        }
+      }
+    `;
+
+    try {
+      await this.handleRateLimit();
+      const response = await this.executeQuery(query);
+      
+      if (!response?.data?.Solana?.DEXTradeByTokens) {
+        console.warn(`⚠️  No token data found for ${targetDate.toISOString().split('T')[0]}`);
+        return [];
+      }
+
+      const trades = response.data.Solana.DEXTradeByTokens;
+      const tokens: BitqueryToken[] = [];
+      
+      // Gruppiere Trades nach Token und berechne Metriken
+      const tokenGroups = new Map<string, any[]>();
+      
+      for (const trade of trades) {
+        const tokenAddress = trade.Trade.Currency.MintAddress;
+        if (!tokenGroups.has(tokenAddress)) {
+          tokenGroups.set(tokenAddress, []);
+        }
+        tokenGroups.get(tokenAddress)!.push(trade);
+      }
+      
+      console.log(`📊 Found ${tokenGroups.size} unique tokens on ${targetDate.toISOString().split('T')[0]}`);
+      
+      for (const [tokenAddress, tokenTrades] of tokenGroups.entries()) {
+        try {
+          // Berechne Token-Metriken für diesen Tag
+          const totalVolume = tokenTrades.reduce((sum, t) => sum + (t.totalVolume || 0), 0);
+          const buyVolume = tokenTrades.reduce((sum, t) => sum + (t.buyVolume || 0), 0);
+          const sellVolume = tokenTrades.reduce((sum, t) => sum + (t.sellVolume || 0), 0);
+          const avgPrice = tokenTrades.reduce((sum, t) => sum + (t.avgPrice || 0), 0) / tokenTrades.length;
+          const uniqueTraders = Math.max(...tokenTrades.map(t => t.uniqueTraders || 0));
+          
+          // Schätze Market Cap (vereinfacht)
+          const estimatedMarketCap = totalVolume * 5; // Volume * 5 als MCap-Schätzung
+          
+          // Prüfe Kriterien
+          if (estimatedMarketCap < criteria.minMarketCap) {
+            continue; // Zu niedrige Market Cap
+          }
+          
+          const firstTrade = tokenTrades[0].Trade;
+          
+          const token: BitqueryToken = {
+            address: tokenAddress,
+            symbol: firstTrade.Currency.Symbol || `TOKEN_${tokenAddress.slice(0, 6)}`,
+            name: firstTrade.Currency.Name || `Token ${tokenAddress.slice(0, 8)}`,
+            marketCap: estimatedMarketCap,
+            volume24h: totalVolume,
+            raydiumLaunchTime: new Date(tokenTrades[0].Block.Time).getTime(),
+            age: (targetDate.getTime() - new Date(tokenTrades[0].Block.Time).getTime()) / (1000 * 60 * 60), // in Stunden
+            priceHistory: [], // Wird später geladen
+            buyVolume,
+            sellVolume,
+            tradersCount: uniqueTraders,
+            priceUsd: avgPrice,
+            dexInfo: {
+              protocolFamily: firstTrade.Dex.ProtocolFamily,
+              protocolName: firstTrade.Dex.ProtocolName,
+              programAddress: firstTrade.Dex.ProgramAddress
+            },
+            tradeStats: {
+              buys: tokenTrades.reduce((sum, t) => sum + (t.buyTrades || 0), 0),
+              sells: tokenTrades.reduce((sum, t) => sum + (t.sellTrades || 0), 0),
+              makers: uniqueTraders,
+              avgTradeSize: totalVolume / Math.max(1, tokenTrades.length)
+            }
+          };
+          
+          // Prüfe Alters-Kriterium
+          if (token.age <= criteria.maxAgeHours) {
+            tokens.push(token);
+            console.log(`✅ ${token.symbol}: MCap $${token.marketCap.toLocaleString()}, Age ${token.age.toFixed(1)}h, Vol $${token.volume24h.toLocaleString()}`);
+          }
+          
+        } catch (error) {
+          console.error(`❌ Error processing token ${tokenAddress}:`, error);
+        }
+      }
+      
+      // Sortiere nach Volume (höchstes zuerst)
+      tokens.sort((a, b) => b.volume24h - a.volume24h);
+      
+      console.log(`🎯 ${tokens.length} tokens met criteria for ${targetDate.toISOString().split('T')[0]}`);
+      return tokens.slice(0, 20); // Max 20 Token
+      
+    } catch (error) {
+      console.error(`❌ Failed to get eligible tokens for ${targetDate.toISOString().split('T')[0]}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * NEUE METHODE: Lädt echte Tages-Preishistorie für einen Token
+   * Für tagesweise progressive Simulation
+   */
+  async getTokenDayHistory(
+    tokenAddress: string,
+    targetDate: Date
+  ): Promise<BitqueryPriceData[]> {
+    
+    console.log(`📊 Loading day history for ${tokenAddress} on ${targetDate.toISOString().split('T')[0]}`);
+    
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const query = `
+      query TokenDayHistory {
+        Solana {
+          DEXTrades(
+            where: {
+              Block: { 
+                Time: { 
+                  between: ["${startOfDay.toISOString()}", "${endOfDay.toISOString()}"]
+                }
+              }
+              Trade: {
+                Currency: {
+                  MintAddress: { is: "${tokenAddress}" }
+                }
+                Dex: { 
+                  ProtocolFamily: { in: ["Raydium"] }
+                }
+              }
+              Transaction: { Result: { Success: true } }
+            }
+            orderBy: { ascending: Block_Time }
+            limit: { count: 1000 }
+          ) {
+            Block {
+              Time
+            }
+            Trade {
+              PriceInUSD
+              AmountInUSD
+              Amount
+              Side {
+                Type
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      await this.handleRateLimit();
+      const response = await this.executeQuery(query);
+      
+      if (!response?.data?.Solana?.DEXTrades || response.data.Solana.DEXTrades.length === 0) {
+        console.warn(`⚠️  No trade history found for ${tokenAddress} on ${targetDate.toISOString().split('T')[0]}`);
+        return [];
+      }
+
+      const trades = response.data.Solana.DEXTrades;
+      console.log(`📊 Found ${trades.length} trades for ${tokenAddress} on target date`);
+      
+      // Konvertiere Trades zu OHLCV-Kerzen (15-Minuten Intervalle)
+      const intervalMs = 15 * 60 * 1000; // 15 Minuten
+      const candles = new Map<number, {
+        timestamp: number;
+        trades: Array<{ price: number; volume: number; time: number }>;
+      }>();
+      
+      // Gruppiere Trades in 15-Minuten-Intervalle
+      for (const trade of trades) {
+        const tradeTime = new Date(trade.Block.Time).getTime();
+        const intervalStart = Math.floor(tradeTime / intervalMs) * intervalMs;
+        
+        if (!candles.has(intervalStart)) {
+          candles.set(intervalStart, {
+            timestamp: intervalStart,
+            trades: []
+          });
+        }
+        
+        candles.get(intervalStart)!.trades.push({
+          price: trade.Trade.PriceInUSD || 0,
+          volume: trade.Trade.AmountInUSD || 0,
+          time: tradeTime
+        });
+      }
+      
+      // Konvertiere zu OHLCV-Format
+      const ohlcvData: BitqueryPriceData[] = [];
+      
+      for (const [timestamp, candleData] of candles.entries()) {
+        if (candleData.trades.length === 0) continue;
+        
+        // Sortiere Trades chronologisch
+        candleData.trades.sort((a, b) => a.time - b.time);
+        
+        const prices = candleData.trades.map(t => t.price).filter(p => p > 0);
+        if (prices.length === 0) continue;
+        
+        const volumes = candleData.trades.map(t => t.volume).filter(v => v > 0);
+        const totalVolume = volumes.reduce((sum, v) => sum + v, 0);
+        
+        const open = prices[0];
+        const close = prices[prices.length - 1];
+        const high = Math.max(...prices);
+        const low = Math.min(...prices);
+        
+        ohlcvData.push({
+          timestamp,
+          open,
+          high,
+          low,
+          close,
+          volume: totalVolume
+        });
+      }
+      
+      // Sortiere chronologisch
+      ohlcvData.sort((a, b) => a.timestamp - b.timestamp);
+      
+      console.log(`📊 Generated ${ohlcvData.length} OHLCV candles for ${tokenAddress} on target date`);
+      
+      return ohlcvData;
+      
+    } catch (error) {
+      console.error(`❌ Failed to get day history for ${tokenAddress}:`, error);
+      return [];
+    }
   }
 } 
