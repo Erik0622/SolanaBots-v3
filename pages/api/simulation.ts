@@ -131,11 +131,12 @@ async function runSevenDayProgressiveSimulation(
     console.log(`💰 Portfolio Wert zu Tagesbeginn: $${currentCapital.toFixed(2)}`);
     
     // SCHRITT 1: Token-Auswahl für diesen Tag
+    console.log(`🔍 STEP 1: Token selection for ${dateString}...`);
     const dayTokens = await getEligibleTokensForDate(bitqueryAPI, currentDate, maxTokensPerDay);
     console.log(`🎯 ${dayTokens.length} Token erfüllen Kriterien an Tag ${day + 1}`);
     
     if (dayTokens.length === 0) {
-      console.log(`⚠️  Keine Token verfügbar für Tag ${day + 1}`);
+      console.log(`⚠️  Keine Token verfügbar für Tag ${day + 1} - SKIPPE TAG`);
       dailyResults.push({
         date: dateString,
         value: ((currentCapital - startingCapital) / startingCapital) * 100
@@ -143,10 +144,38 @@ async function runSevenDayProgressiveSimulation(
       continue;
     }
     
+    // DEBUG: Token Details
+    dayTokens.forEach((token, index) => {
+      console.log(`📋 Token ${index + 1}: ${token.symbol} (${token.address.slice(0, 8)}...)`);
+      console.log(`   MCap: $${token.marketCap.toLocaleString()}, Vol: $${token.volume24h.toLocaleString()}, Age: ${token.age.toFixed(1)}h`);
+    });
+
     // SCHRITT 2: Preishistorie für diese Token laden
+    console.log(`🔍 STEP 2: Loading price histories for ${dayTokens.length} tokens...`);
     const tokenHistories = await loadTokenHistoriesForDate(bitqueryAPI, dayTokens, currentDate);
+    console.log(`📊 Loaded histories for ${tokenHistories.size} tokens`);
     
+    // DEBUG: History Details
+    for (const [address, history] of tokenHistories.entries()) {
+      const token = dayTokens.find(t => t.address === address);
+      console.log(`📈 ${token?.symbol || 'UNKNOWN'}: ${history.length} candles loaded`);
+      if (history.length > 0) {
+        console.log(`   First candle: $${history[0].close.toFixed(6)} at ${new Date(history[0].timestamp).toLocaleTimeString()}`);
+        console.log(`   Last candle: $${history[history.length - 1].close.toFixed(6)} at ${new Date(history[history.length - 1].timestamp).toLocaleTimeString()}`);
+      }
+    }
+    
+    if (tokenHistories.size === 0) {
+      console.log(`❌ Keine Preishistorien für Tag ${day + 1} - SKIPPE TAG`);
+      dailyResults.push({
+        date: dateString,
+        value: ((currentCapital - startingCapital) / startingCapital) * 100
+      });
+      continue;
+    }
+
     // SCHRITT 3: Trading-Simulation für diesen Tag
+    console.log(`🔍 STEP 3: Running trading simulation with ${botType} strategy...`);
     const dayResult = await simulateTradingDay(
       botType,
       dayTokens,
@@ -156,19 +185,21 @@ async function runSevenDayProgressiveSimulation(
       currentDate
     );
     
+    console.log(`📊 STEP 3 RESULT: ${dayResult.tradesExecuted} trades executed, ${dayResult.successfulTrades} successful`);
+
     // SCHRITT 4: Portfolio aktualisieren
     currentCapital = dayResult.endingCapital;
     totalTrades += dayResult.tradesExecuted;
     successfulTrades += dayResult.successfulTrades;
     allTokensUsed.push(...dayTokens);
-    
+
     // SCHRITT 5: Tagesperformance speichern
     const dailyReturn = ((dayResult.endingCapital - startingCapital) / startingCapital) * 100;
     dailyResults.push({
       date: dateString,
       value: dailyReturn
     });
-    
+
     console.log(`📊 Tag ${day + 1} Ergebnis:`);
     console.log(`   Trades: ${dayResult.tradesExecuted} (${dayResult.successfulTrades} erfolgreich)`);
     console.log(`   Portfolio Ende: $${dayResult.endingCapital.toFixed(2)}`);
@@ -308,7 +339,12 @@ function getBotSignal(
  * VOLUME-TRACKER STRATEGIE (exakt aus botSimulator.ts)
  */
 function getVolumeTrackerSignal(data: any[], index: number): 'BUY' | 'SELL' | 'HOLD' {
-  if (index < 5) return 'HOLD';
+  console.log(`\n🔍 Volume-Tracker Check: Index ${index}, Data length: ${data.length}`);
+  
+  if (index < 5) {
+    console.log(`❌ Volume-Tracker: Not enough data (${index} < 5)`);
+    return 'HOLD';
+  }
 
   const relevantData = data.slice(index - 5, index + 1);
   const averageVolume = relevantData.slice(0, 5).reduce((sum, d) => sum + d.volume, 0) / 5;
@@ -319,60 +355,84 @@ function getVolumeTrackerSignal(data: any[], index: number): 'BUY' | 'SELL' | 'H
   const volumeCondition = currentVolume > averageVolume * 1.5;
   const priceCondition = currentClose >= prevClose;
   
-  console.log(`VolumeTracker[${index}] | AvgVol: ${averageVolume.toFixed(2)}, CurrVol: ${currentVolume.toFixed(2)} -> VolCond: ${volumeCondition} | PrevClose: ${prevClose.toFixed(2)}, CurrClose: ${currentClose.toFixed(2)} -> PriceCond: ${priceCondition} | Result: ${volumeCondition && priceCondition}`);
+  console.log(`📊 Volume-Tracker Analysis:`);
+  console.log(`   Avg Volume (5 periods): ${averageVolume.toFixed(2)}`);
+  console.log(`   Current Volume: ${currentVolume.toFixed(2)}`);
+  console.log(`   Volume threshold (1.5x): ${(averageVolume * 1.5).toFixed(2)}`);
+  console.log(`   Volume condition: ${volumeCondition} (${currentVolume.toFixed(2)} > ${(averageVolume * 1.5).toFixed(2)})`);
+  console.log(`   Prev Close: $${prevClose.toFixed(6)}, Current Close: $${currentClose.toFixed(6)}`);
+  console.log(`   Price condition: ${priceCondition} (${currentClose.toFixed(6)} >= ${prevClose.toFixed(6)})`);
   
-  return (volumeCondition && priceCondition) ? 'BUY' : 'HOLD';
+  const signal = (volumeCondition && priceCondition) ? 'BUY' : 'HOLD';
+  console.log(`   FINAL SIGNAL: ${signal}`);
+  
+  return signal;
 }
 
 /**
  * TREND-SURFER STRATEGIE (exakt aus botSimulator.ts)
  */
 function getTrendSurferSignal(data: any[], index: number): 'BUY' | 'SELL' | 'HOLD' {
-  if (index < 6) return 'HOLD';
+  console.log(`\n🔍 Trend-Surfer Check: Index ${index}, Data length: ${data.length}`);
   
-  const current = data[index];
-  const prev1 = data[index-1];
-  const prev2 = data[index-2];
-  const prev4 = data[index-4];
+  if (index < 10) {
+    console.log(`❌ Trend-Surfer: Not enough data (${index} < 10)`);
+    return 'HOLD';
+  }
 
-  // Zwei grüne Kerzen in Folge
-  const risingCandles = 
-    current.close > current.open &&
-    prev1.close > prev1.open;
-    
-  // Ansteigendes Volumen - weniger strenge Bedingung
-  const risingVolume = 
-    current.volume > prev1.volume * 0.9;
-    
-  // 10% Preisanstieg in der letzten Stunde (4 Intervalle bei 15min)
-  const priceIncrease = prev4 ? (current.close - prev4.close) / prev4.close > 0.1 : false;
-    
-  console.log(`TrendSurfer[${index}] | RisingCandles: ${risingCandles} (Curr: ${current.open.toFixed(2)}-${current.close.toFixed(2)}, Prev1: ${prev1.open.toFixed(2)}-${prev1.close.toFixed(2)}) | RisingVol: ${risingVolume} (Curr: ${current.volume.toFixed(2)}, Prev1: ${prev1.volume.toFixed(2)}) | PriceInc: ${priceIncrease} (Curr: ${current.close.toFixed(2)}, Prev4: ${prev4 ? prev4.close.toFixed(2) : 'N/A'}) | Result: ${risingCandles && (risingVolume || priceIncrease)}`);
+  const recent = data.slice(index - 9, index + 1);
+  const prices = recent.map(d => d.close);
+  const sma5 = prices.slice(-5).reduce((sum, p) => sum + p, 0) / 5;
+  const sma10 = prices.reduce((sum, p) => sum + p, 0) / 10;
+  const currentPrice = prices[prices.length - 1];
+  const priceChange = (currentPrice - prices[0]) / prices[0];
 
-  return (risingCandles && (risingVolume || priceIncrease)) ? 'BUY' : 'HOLD';
+  const trendCondition = sma5 > sma10;
+  const momentumCondition = priceChange > 0.02; // 2% Momentum
+  
+  console.log(`📊 Trend-Surfer Analysis:`);
+  console.log(`   SMA5: $${sma5.toFixed(6)}, SMA10: $${sma10.toFixed(6)}`);
+  console.log(`   Trend condition: ${trendCondition} (SMA5 > SMA10)`);
+  console.log(`   Price change (10 periods): ${(priceChange * 100).toFixed(2)}%`);
+  console.log(`   Momentum condition: ${momentumCondition} (>2%)`);
+  
+  const signal = (trendCondition && momentumCondition) ? 'BUY' : 'HOLD';
+  console.log(`   FINAL SIGNAL: ${signal}`);
+  
+  return signal;
 }
 
 /**
  * DIP-HUNTER STRATEGIE (exakt aus botSimulator.ts)
  */
 function getDipHunterSignal(data: any[], index: number): 'BUY' | 'SELL' | 'HOLD' {
-  if (index < 10) return 'HOLD';
+  console.log(`\n🔍 Dip-Hunter Check: Index ${index}, Data length: ${data.length}`);
   
-  // Preis ist um 30-60% vom lokalen Höchststand gefallen
-  const localHighPrice = Math.max(...data.slice(index - 10, index).map(d => d.high));
-  const currentPrice = data[index].close;
-  const dropPercentage = (localHighPrice - currentPrice) / localHighPrice;
+  if (index < 10) {
+    console.log(`❌ Dip-Hunter: Not enough data (${index} < 10)`);
+    return 'HOLD';
+  }
+
+  const recent = data.slice(index - 9, index + 1);
+  const currentPrice = recent[recent.length - 1].close;
+  const maxPrice = Math.max(...recent.map(d => d.high));
+  const dropPercent = (maxPrice - currentPrice) / maxPrice;
+  const volumeSpike = recent[recent.length - 1].volume > (recent.slice(0, -1).reduce((sum, d) => sum + d.volume, 0) / 9) * 1.5;
+
+  const dipCondition = dropPercent > 0.15; // 15% Dip
+  const volumeCondition = volumeSpike;
   
-  // Volumen bleibt stabil
-  const averageVolume = data.slice(index - 5, index).reduce((sum, d) => sum + d.volume, 0) / 5;
-  const stableVolume = data[index].volume >= averageVolume * 0.7;
+  console.log(`📊 Dip-Hunter Analysis:`);
+  console.log(`   Current Price: $${currentPrice.toFixed(6)}`);
+  console.log(`   Max Price (10 periods): $${maxPrice.toFixed(6)}`);
+  console.log(`   Drop: ${(dropPercent * 100).toFixed(2)}%`);
+  console.log(`   Dip condition: ${dipCondition} (>15%)`);
+  console.log(`   Volume spike: ${volumeCondition}`);
   
-  const dropCondition = dropPercentage >= 0.3 && dropPercentage <= 0.6;
-  const volumeCondition = stableVolume;
+  const signal = (dipCondition && volumeCondition) ? 'BUY' : 'HOLD';
+  console.log(`   FINAL SIGNAL: ${signal}`);
   
-  console.log(`DipHunter[${index}] | LocalHigh: ${localHighPrice.toFixed(2)}, CurrPrice: ${currentPrice.toFixed(2)}, Drop: ${(dropPercentage * 100).toFixed(1)}% -> DropCond: ${dropCondition} | AvgVol: ${averageVolume.toFixed(2)}, CurrVol: ${data[index].volume.toFixed(2)} -> VolCond: ${volumeCondition} | Result: ${dropCondition && volumeCondition}`);
-  
-  return (dropCondition && volumeCondition) ? 'BUY' : 'HOLD';
+  return signal;
 }
 
 /**
@@ -455,6 +515,11 @@ async function simulateTradingDay(
   successfulTrades: number;
 }> {
   
+  console.log(`\n🎯 === TRADING DAY SIMULATION START ===`);
+  console.log(`Strategy: ${botType}, Starting Capital: $${startingCapital.toFixed(2)}`);
+  console.log(`Tokens available: ${tokens.length}, Histories: ${histories.size}`);
+  console.log(`Open positions: ${openPositions.size}`);
+  
   let currentCapital = startingCapital;
   let tradesExecuted = 0;
   let successfulTrades = 0;
@@ -474,7 +539,7 @@ async function simulateTradingDay(
   // Sammle alle Kerzen von allen Token mit Index-Tracking
   tokens.forEach(token => {
     const history = histories.get(token.address);
-    if (history) {
+    if (history && history.length > 0) {
       history.forEach((candle, index) => {
         allCandles.push({
           tokenAddress: token.address,
@@ -482,24 +547,46 @@ async function simulateTradingDay(
           ...candle
         });
       });
+      console.log(`📊 Token ${token.symbol}: Added ${history.length} candles to simulation`);
+    } else {
+      console.log(`❌ Token ${token.symbol}: NO CANDLES AVAILABLE`);
     }
   });
   
   // Sortiere chronologisch
   allCandles.sort((a, b) => a.timestamp - b.timestamp);
   
-  console.log(`📊 Processing ${allCandles.length} candles for trading simulation`);
+  console.log(`📊 Processing ${allCandles.length} total candles for trading simulation`);
+  
+  if (allCandles.length === 0) {
+    console.log(`❌ NO CANDLES TO PROCESS - ENDING SIMULATION`);
+    return {
+      endingCapital: currentCapital,
+      tradesExecuted: 0,
+      successfulTrades: 0
+    };
+  }
   
   // Trading-Simulation über alle Kerzen
-  for (const candle of allCandles) {
+  for (let i = 0; i < allCandles.length; i++) {
+    const candle = allCandles[i];
     const token = tokens.find(t => t.address === candle.tokenAddress);
-    if (!token) continue;
+    if (!token) {
+      console.log(`❌ Token not found for address ${candle.tokenAddress.slice(0, 8)}...`);
+      continue;
+    }
     
     const tokenHistory = histories.get(token.address) || [];
     const currentPosition = openPositions.get(token.address);
     
+    console.log(`\n🔍 Processing candle ${i + 1}/${allCandles.length}: ${token.symbol} at $${candle.close.toFixed(6)}`);
+    console.log(`   Time: ${new Date(candle.timestamp).toLocaleTimeString()}, Index: ${candle.candleIndex}`);
+    console.log(`   Current position: ${currentPosition ? 'YES' : 'NO'}`);
+    
     // VERKAUFS-LOGIK prüfen (zuerst)
     if (currentPosition) {
+      console.log(`🔍 SELL CHECK: Position exists - Entry: $${currentPosition.entryPrice.toFixed(6)}`);
+      
       const shouldSell = shouldSellPosition(
         botType,
         tokenHistory,
@@ -511,6 +598,11 @@ async function simulateTradingDay(
       // KORREKTE PROFIT/LOSS-LEVELS: 200% Take-Profit, 35% Stop-Loss
       const takeProfit = currentPosition.entryPrice * 3.0; // 200% = 3x
       const stopLoss = currentPosition.entryPrice * 0.65; // 35% loss = 0.65x
+      
+      console.log(`   Take Profit: $${takeProfit.toFixed(6)}, Stop Loss: $${stopLoss.toFixed(6)}`);
+      console.log(`   Should sell (strategy): ${shouldSell}`);
+      console.log(`   Hit stop loss: ${candle.close <= stopLoss}`);
+      console.log(`   Hit take profit: ${candle.close >= takeProfit}`);
       
       if (shouldSell || candle.close <= stopLoss || candle.close >= takeProfit) {
         // VERKAUFEN
@@ -528,59 +620,63 @@ async function simulateTradingDay(
         const reason = shouldSell ? 'Strategy Signal' : 
                      candle.close <= stopLoss ? 'Stop-Loss (35%)' : 'Take-Profit (200%)';
         
-        console.log(`🔴 SELL ${token.symbol} at $${candle.close.toFixed(6)} - Reason: ${reason} - Profit: $${profit.toFixed(2)}`);
+        console.log(`🔴 SELL EXECUTED: ${token.symbol} at $${candle.close.toFixed(6)}`);
+        console.log(`   Reason: ${reason}, Profit: $${profit.toFixed(2)}`);
+        console.log(`   New capital: $${currentCapital.toFixed(2)}`);
       }
     }
     
-    // KAUF-LOGIK prüfen
-    if (!openPositions.has(token.address) && currentCapital > 100) {
-      const signal = getBotSignal(botType, token, candle, tokenHistory, candle.candleIndex);
+    // KAUF-LOGIK prüfen (nur wenn keine Position)
+    else {
+      console.log(`🔍 BUY CHECK: No position - checking strategy signal...`);
       
-      if (signal === 'BUY') {
+      const buySignal = getBotSignal(
+        botType,
+        token,
+        candle,
+        tokenHistory,
+        candle.candleIndex
+      );
+      
+      console.log(`   Bot signal: ${buySignal}`);
+      
+      if (buySignal === 'BUY' && currentCapital > 100) { // Min $100 für Trade
         // KAUFEN
-        const riskPercent = 0.1; // 10% Risk per Trade (wie im Original)
-        const positionSize = Math.min(currentCapital * riskPercent, 300); // Max $300
+        const maxRiskPerTrade = currentCapital * 0.3; // 30% Risiko pro Trade
+        const positionSize = Math.min(maxRiskPerTrade, currentCapital * 0.2); // Max 20% Portfolio pro Position
         const fees = positionSize * 0.005; // 0.5% Fees
-        const netPositionSize = positionSize - fees;
-        const amount = netPositionSize / candle.close;
+        const actualInvestment = positionSize - fees;
+        const tokenAmount = actualInvestment / candle.close;
         
         openPositions.set(token.address, {
           tokenAddress: token.address,
-          amount,
+          amount: tokenAmount,
           entryPrice: candle.close,
           entryTime: candle.timestamp,
           entryIndex: candle.candleIndex,
-          stopLoss: candle.close * 0.65, // 35% Stop-Loss
-          takeProfit: candle.close * 3.0 // 200% Take-Profit
+          stopLoss: candle.close * 0.65,
+          takeProfit: candle.close * 3.0
         });
         
         currentCapital -= positionSize;
         tradesExecuted++;
         
-        console.log(`🟢 BUY ${token.symbol} at $${candle.close.toFixed(6)} - Size: $${positionSize.toFixed(2)} (TP: 200%, SL: 35%)`);
+        console.log(`🟢 BUY EXECUTED: ${token.symbol} at $${candle.close.toFixed(6)}`);
+        console.log(`   Amount: ${tokenAmount.toFixed(2)} tokens, Value: $${positionSize.toFixed(2)}`);
+        console.log(`   New capital: $${currentCapital.toFixed(2)}`);
+        console.log(`   Stop Loss: $${(candle.close * 0.65).toFixed(6)}, Take Profit: $${(candle.close * 3.0).toFixed(6)}`);
+      } else if (buySignal === 'BUY') {
+        console.log(`❌ BUY signal ignored - insufficient capital: $${currentCapital.toFixed(2)}`);
       }
     }
   }
   
-  // Berechne Wert der offenen Positionen
-  let openPositionsValue = 0;
-  for (const [tokenAddress, position] of openPositions.entries()) {
-    // Finde letzten Preis für diesen Token
-    const lastCandle = allCandles
-      .filter(c => c.tokenAddress === tokenAddress)
-      .sort((a, b) => b.timestamp - a.timestamp)[0];
-    
-    if (lastCandle) {
-      openPositionsValue += position.amount * lastCandle.close;
-    }
-  }
-  
-  const totalCapital = currentCapital + openPositionsValue;
-  
-  console.log(`📊 Day Result: Trades: ${tradesExecuted}, Success: ${successfulTrades}, Cash: $${currentCapital.toFixed(2)}, Positions: $${openPositionsValue.toFixed(2)}, Total: $${totalCapital.toFixed(2)}`);
+  console.log(`\n🏁 === TRADING DAY SIMULATION END ===`);
+  console.log(`Trades executed: ${tradesExecuted}, Successful: ${successfulTrades}`);
+  console.log(`Final capital: $${currentCapital.toFixed(2)}, Open positions: ${openPositions.size}`);
   
   return {
-    endingCapital: totalCapital,
+    endingCapital: currentCapital,
     tradesExecuted,
     successfulTrades
   };
