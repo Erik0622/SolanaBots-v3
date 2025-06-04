@@ -69,343 +69,53 @@ export class BitqueryAPI {
   /**
    * Findet neue Memecoins die nach Raydium migriert sind
    * Filter: < 24h alt, > 50k Market Cap, 25min nach Launch
-   * NEUE STRATEGIE: DexScreener als Fallback für echte Daten
+   * NUR ECHTE BITQUERY-DATEN - KEINE MOCK-SIMULATIONEN!
    */
   async getNewRaydiumMemecoins(limit: number = 20): Promise<BitqueryToken[]> {
-    console.log('🚀 Searching for real new memecoins with high volatility...');
+    console.log('🔍 Searching for REAL new Raydium-migrated tokens <24h - NO MOCK DATA!');
     
     try {
-      // STRATEGIE 1: Versuche Bitquery API
-      const bitqueryTokens = await this.getBitqueryTokens(limit);
-      if (bitqueryTokens.length > 0) {
-        console.log(`✅ Bitquery API: ${bitqueryTokens.length} echte Token gefunden`);
-        return bitqueryTokens;
+      // NUR ECHTE BITQUERY API - Keine Fallbacks zu Mock-Daten
+      const realTokens = await this.getBitqueryTokens(limit);
+      
+      if (realTokens.length === 0) {
+        console.error('❌ KEINE ECHTEN TOKEN GEFUNDEN! Bitquery API Problem - Details in Logs');
+        throw new Error('Keine echten neuen Raydium-Token gefunden. API-Problem!');
       }
+      
+      console.log(`✅ ${realTokens.length} ECHTE neue Raydium-Token <24h gefunden (KEINE MOCK-DATEN)`);
+      return realTokens;
+      
     } catch (error) {
-      console.warn('❌ Bitquery API Fehler:', error);
-    }
-
-    try {
-      // STRATEGIE 2: DexScreener Fallback für echte Daten
-      console.log('🔄 Fallback to DexScreener API for real tokens...');
-      const dexScreenerTokens = await this.getDexScreenerTokens(limit);
-      if (dexScreenerTokens.length > 0) {
-        console.log(`✅ DexScreener API: ${dexScreenerTokens.length} echte Token gefunden`);
-        return dexScreenerTokens;
-      }
-    } catch (error) {
-      console.warn('❌ DexScreener API Fehler:', error);
-    }
-
-    // STRATEGIE 3: Birdeye als weiterer Fallback
-    try {
-      console.log('🔄 Fallback to Birdeye API for real tokens...');
-      const birdeyeTokens = await this.getBirdeyeTokens(limit);
-      if (birdeyeTokens.length > 0) {
-        console.log(`✅ Birdeye API: ${birdeyeTokens.length} echte Token gefunden`);
-        return birdeyeTokens;
-      }
-    } catch (error) {
-      console.warn('❌ Birdeye API Fehler:', error);
-    }
-
-    // LETZTE OPTION: Echte historische Memecoin-Daten statt generierte Mock-Daten
-    console.log('🔄 Using historical real memecoin data as final fallback...');
-    return this.getRealHistoricalTokens(limit);
-  }
-
-  /**
-   * Neue Strategie: DexScreener API für echte Token-Daten
-   */
-  private async getDexScreenerTokens(limit: number): Promise<BitqueryToken[]> {
-    try {
-      console.log('🔍 Fetching real tokens from DexScreener...');
+      console.error('❌ BITQUERY API FEHLGESCHLAGEN:', error);
       
-      // DexScreener Latest Tokens API
-      const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/raydium', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'SolanaBotsV3/1.0'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`DexScreener API Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const pairs = data.pairs || [];
-
-      const validTokens: BitqueryToken[] = [];
-
-      for (const pair of pairs.slice(0, limit * 2)) {
-        try {
-          const token = pair.baseToken;
-          const createdAt = new Date(pair.pairCreatedAt).getTime();
-          const ageHours = (Date.now() - createdAt) / (1000 * 60 * 60);
-          
-          // Filter: <24h, >50k MCap, min 0.5h nach Launch
-          if (ageHours <= 24 && ageHours >= 0.5 && pair.marketCap >= 50000) {
-            
-            // Hole echte Preishistorie über DexScreener
-            const priceHistory = await this.getDexScreenerPriceHistory(token.address);
-            const volatility = this.calculateRealVolatility(priceHistory);
-            
-            // Nur Token mit echter Volatilität (>30% in 24h)
-            if (volatility >= 30) {
-              console.log(`✅ ECHTE VOLATILITÄT gefunden: ${token.symbol} - ${volatility.toFixed(1)}% täglich`);
-              
-              validTokens.push({
-                address: token.address,
-                symbol: token.symbol,
-                name: token.name,
-                marketCap: pair.marketCap,
-                volume24h: pair.volume?.h24 || 0,
-                raydiumLaunchTime: createdAt,
-                age: ageHours,
-                priceHistory,
-                volatility,
-                priceChange24h: pair.priceChange?.h24 || 0
-              });
-
-              if (validTokens.length >= limit) break;
-            } else {
-              console.log(`❌ Zu niedrige Volatilität: ${token.symbol} - nur ${volatility.toFixed(1)}%`);
-            }
-          }
-        } catch (tokenError) {
-          console.warn(`Warning processing token:`, tokenError);
-          continue;
-        }
-      }
-
-      return validTokens;
-    } catch (error) {
-      console.error('DexScreener API Error:', error);
-      return [];
+      // KEINE Mock-Fallbacks mehr! User will nur echte Daten
+      throw new Error(`Bitquery API für echte Token fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   }
 
   /**
-   * Birdeye API als zusätzlicher Fallback
-   */
-  private async getBirdeyeTokens(limit: number): Promise<BitqueryToken[]> {
-    try {
-      const apiKey = process.env.BIRDEYE_API_KEY;
-      if (!apiKey) {
-        console.log('⚠️  Birdeye API Key fehlt');
-        return [];
-      }
-
-      console.log('🐦 Fetching real tokens from Birdeye...');
-      
-      const response = await fetch('https://public-api.birdeye.so/defi/tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50', {
-        headers: {
-          'X-API-KEY': apiKey,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Birdeye API Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const tokens = data.data?.tokens || [];
-
-      const validTokens: BitqueryToken[] = [];
-
-      for (const tokenData of tokens.slice(0, limit * 2)) {
-        try {
-          const createdAt = Date.now() - (Math.random() * 20 * 60 * 60 * 1000); // Estimate
-          const ageHours = (Date.now() - createdAt) / (1000 * 60 * 60);
-          
-          if (ageHours <= 24 && tokenData.mc >= 50000) {
-            const priceHistory = await this.getBirdeyePriceHistory(tokenData.address);
-            const volatility = this.calculateRealVolatility(priceHistory);
-            
-            if (volatility >= 30) {
-              console.log(`✅ ECHTE VOLATILITÄT (Birdeye): ${tokenData.symbol} - ${volatility.toFixed(1)}%`);
-              
-              validTokens.push({
-                address: tokenData.address,
-                symbol: tokenData.symbol,
-                name: tokenData.name,
-                marketCap: tokenData.mc,
-                volume24h: tokenData.v24hUSD || 0,
-                raydiumLaunchTime: createdAt,
-                age: ageHours,
-                priceHistory,
-                volatility,
-                priceChange24h: tokenData.priceChange24h || 0
-              });
-
-              if (validTokens.length >= limit) break;
-            }
-          }
-        } catch (tokenError) {
-          continue;
-        }
-      }
-
-      return validTokens;
-    } catch (error) {
-      console.error('Birdeye API Error:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Echte historische Memecoin-Daten statt Mock-Daten
-   */
-  private getRealHistoricalTokens(limit: number): BitqueryToken[] {
-    console.log('📚 Using real historical memecoin patterns...');
-    
-    // Echte historische Memecoin-Muster von bekannten erfolgreichen Token
-    const realMemecoins = [
-      {
-        symbol: 'BONK',
-        pattern: 'moonshot', // +1000% in 3 Tagen
-        basePrice: 0.00001,
-        volatilityPattern: [0.15, 2.5, -0.3, 0.8, -0.15, 1.2, -0.4] // Echte Volatilität
-      },
-      {
-        symbol: 'WIF',
-        pattern: 'steady-climb', // +300% über Woche
-        basePrice: 0.00005,
-        volatilityPattern: [0.25, 0.4, -0.1, 0.6, 0.3, -0.2, 0.5]
-      },
-      {
-        symbol: 'POPCAT',
-        pattern: 'pump-dump', // +500% dann -60%
-        basePrice: 0.00003,
-        volatilityPattern: [0.8, 1.2, 2.0, -0.6, -0.3, 0.4, -0.2]
-      },
-      {
-        symbol: 'PEPE2',
-        pattern: 'slow-burn', // Kontinuierliches Wachstum
-        basePrice: 0.00002,
-        volatilityPattern: [0.3, 0.2, 0.5, 0.1, 0.4, 0.2, 0.3]
-      }
-    ];
-
-    const tokens: BitqueryToken[] = [];
-
-    for (let i = 0; i < limit && i < realMemecoins.length; i++) {
-      const template = realMemecoins[i];
-      const launchTime = Date.now() - (Math.random() * 20 * 60 * 60 * 1000);
-      const priceHistory = this.generateRealMemecoinHistory(template);
-      const volatility = this.calculateRealVolatility(priceHistory);
-
-      tokens.push({
-        address: `real_${template.symbol.toLowerCase()}_${Date.now()}_${i}`,
-        symbol: template.symbol,
-        name: `${template.symbol} Token`,
-        marketCap: 75000 + Math.random() * 400000,
-        volume24h: 25000 + Math.random() * 150000,
-        raydiumLaunchTime: launchTime,
-        age: (Date.now() - launchTime) / (1000 * 60 * 60),
-        priceHistory,
-        volatility,
-        priceChange24h: ((priceHistory[priceHistory.length - 1].close - priceHistory[0].open) / priceHistory[0].open) * 100
-      });
-    }
-
-    console.log(`✅ ${tokens.length} echte historische Memecoin-Muster geladen`);
-    return tokens;
-  }
-
-  /**
-   * Generiert echte Memecoin-Preishistorie basierend auf realen Mustern
-   */
-  private generateRealMemecoinHistory(template: any): BitqueryPriceData[] {
-    const history: BitqueryPriceData[] = [];
-    let currentPrice = template.basePrice;
-    const now = Date.now();
-    const { volatilityPattern } = template;
-
-    // 288 Candles = 24 Stunden bei 5-Minuten-Intervallen
-    for (let i = 288; i >= 0; i--) {
-      const timestamp = now - (i * 5 * 60 * 1000);
-      const dayIndex = Math.floor((288 - i) / 48); // Welcher Tag (0-6)
-      const volatilityMultiplier = volatilityPattern[dayIndex % volatilityPattern.length];
-      
-      // Echte Memecoin-Volatilität: 10-200% Schwankungen
-      const baseVolatility = 0.15; // 15% base volatility
-      const memeVolatility = baseVolatility * (1 + Math.abs(volatilityMultiplier) * 5); // Bis zu 90% volatility
-      const direction = volatilityMultiplier >= 0 ? 1 : -1;
-      const randomFactor = (Math.random() - 0.5) * 2; // -1 bis +1
-      
-      const change = direction * memeVolatility * randomFactor;
-      
-      const open = currentPrice;
-      const close = currentPrice * (1 + change);
-      
-      // Extreme Wicks für echte Memecoin-Bewegungen
-      const wickMultiplier = 1 + Math.random() * 0.3; // Bis zu 30% Wicks
-      const high = Math.max(open, close) * wickMultiplier;
-      const low = Math.min(open, close) / wickMultiplier;
-      
-      // Volume-Spikes bei großen Bewegungen
-      let volume = 1000 + Math.random() * 5000;
-      if (Math.abs(change) > 0.2) { // Bei >20% Bewegung
-        volume *= (1 + Math.abs(change) * 10); // Volume explodiert
-      }
-      
-      history.push({
-        timestamp,
-        open,
-        high,
-        low,
-        close,
-        volume
-      });
-      
-      currentPrice = close;
-      
-      // Verhindere negative Preise
-      if (currentPrice <= 0) {
-        currentPrice = template.basePrice * 0.1;
-      }
-    }
-    
-    return history;
-  }
-
-  /**
-   * Berechnet echte Volatilität aus Preisdaten
-   */
-  private calculateRealVolatility(priceHistory: BitqueryPriceData[]): number {
-    if (priceHistory.length < 2) return 0;
-    
-    const returns = [];
-    for (let i = 1; i < priceHistory.length; i++) {
-      const return_ = (priceHistory[i].close - priceHistory[i-1].close) / priceHistory[i-1].close;
-      returns.push(Math.abs(return_));
-    }
-    
-    const avgDailyMove = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-    return avgDailyMove * 100 * Math.sqrt(288); // Annualisiert auf 24h
-  }
-
-  /**
-   * Original Bitquery API Methode (Fallback für Methode 1)
+   * ECHTE Bitquery API für neue Raydium-Token <24h - KEINE MOCK-DATEN!
    */
   private async getBitqueryTokens(limit: number): Promise<BitqueryToken[]> {
-    // Verwende ein vereinfachtes Query für bessere Kompatibilität
+    // Erweiterte Query für bessere Token-Erkennung
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
     const query = `
-      query NewRaydiumMemecoins {
+      query NewRaydiumTokens24h {
         Solana {
           DEXTrades(
             where: {
               Trade: {
-                Dex: { ProtocolName: { in: ["Raydium", "raydium", "Raydium V4"] } }
+                Dex: { 
+                  ProtocolName: { in: ["Raydium", "raydium", "Raydium V4", "Raydium CLMM"] } 
+                }
                 Currency: { 
                   MintAddress: { 
                     notIn: [
                       "So11111111111111111111111111111111111111112",
                       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                      "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
                       "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
                     ]
                   }
@@ -414,12 +124,12 @@ export class BitqueryAPI {
               Transaction: { Result: { Success: true } }
               Block: { 
                 Time: { 
-                  since: "${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}"
+                  since: "${since24h}"
                 }
               }
             }
             orderBy: { descending: Block_Time }
-            limit: { count: ${limit} }
+            limit: { count: ${limit * 5} }
           ) {
             Trade {
               Currency {
@@ -435,9 +145,11 @@ export class BitqueryAPI {
               }
               Price
               AmountInUSD
+              Amount
             }
             Block {
               Time
+              Height
             }
             count(uniq: transactions)
           }
@@ -446,184 +158,214 @@ export class BitqueryAPI {
     `;
 
     try {
-      console.log('🔍 Suche nach neuen Raydium Memecoins über Bitquery...');
+      console.log(`🔍 Suche nach ECHTEN neuen Raydium-Token <24h über Bitquery API...`);
+      console.log(`📅 Zeitraum: ${since24h} bis jetzt`);
       await this.handleRateLimit();
       
       const response = await this.executeQuery(query);
       
       if (!response?.data?.Solana?.DEXTrades) {
-        console.warn('⚠️  Keine DEX-Trade-Daten von Bitquery erhalten');
-        return [];
+        console.error('❌ BITQUERY API PROBLEM: Keine DEXTrades in Response');
+        console.error('Response structure:', JSON.stringify(response, null, 2));
+        throw new Error('Bitquery API liefert keine DEXTrades-Daten');
       }
 
       const trades = response.data.Solana.DEXTrades;
-      const tokenMap = new Map<string, any>();
-
-      // Gruppiere Trades nach Token
-      trades.forEach((trade: any) => {
-        const address = trade.Trade.Currency.MintAddress;
-        if (!tokenMap.has(address)) {
-          tokenMap.set(address, {
-            address,
-            symbol: trade.Trade.Currency.Symbol || 'UNKNOWN',
-            name: trade.Trade.Currency.Name || 'Unknown Token',
-            firstTradeTime: trade.Block.Time,
-            trades: [],
-            totalVolume: 0
-          });
-        }
-        
-        const token = tokenMap.get(address);
-        token.trades.push(trade);
-        token.totalVolume += trade.Trade.AmountInUSD || 0;
-        
-        // Update first trade time
-        if (new Date(trade.Block.Time) < new Date(token.firstTradeTime)) {
-          token.firstTradeTime = trade.Block.Time;
-        }
-      });
-
-      const filteredTokens: BitqueryToken[] = [];
-      console.log(`📊 ${tokenMap.size} eindeutige Token von Bitquery erhalten, filtere nach Kriterien...`);
-
-      // Verwende Array.from für bessere TypeScript-Kompatibilität
-      Array.from(tokenMap.entries()).forEach(([address, tokenData]) => {
-        const firstTradeTime = new Date(tokenData.firstTradeTime).getTime();
-        const ageHours = (Date.now() - firstTradeTime) / (1000 * 60 * 60);
-        const marketCap = tokenData.totalVolume * 10; // Schätzung: Volume * 10 als MCap
-        const volume24h = tokenData.totalVolume;
-
-        // Filter: min 50k Market Cap, max 24h alt, min 25min nach Launch
-        if (marketCap >= 50000 && ageHours <= 24 && ageHours >= 0.42) { // 0.42h = 25min
-          console.log(`✅ Token qualifiziert: ${tokenData.symbol} (MCap: $${marketCap.toLocaleString()}, Age: ${ageHours.toFixed(1)}h)`);
-          
-          filteredTokens.push({
-            address,
-            symbol: tokenData.symbol,
-            name: tokenData.name,
-            marketCap,
-            volume24h,
-            raydiumLaunchTime: firstTradeTime,
-            age: ageHours,
-            priceHistory: [] // Wird später asynchron gefüllt
-          });
-
-          // Begrenze auf gewünschte Anzahl
-          if (filteredTokens.length >= limit) return;
-        } else {
-          console.log(`❌ Token nicht qualifiziert: ${tokenData.symbol} (MCap: $${marketCap.toLocaleString()}, Age: ${ageHours.toFixed(1)}h)`);
-        }
-      });
-
-      // Hole die Preishistorie für die gefilterten Token
-      for (let i = 0; i < filteredTokens.length; i++) {
-        const token = filteredTokens[i];
-        token.priceHistory = await this.get5MinutePriceHistory(token.address, token.raydiumLaunchTime);
+      console.log(`📊 ${trades.length} rohe Bitquery-Trades erhalten, filtere nach neuen Token...`);
+      
+      if (trades.length === 0) {
+        console.error('❌ KEINE TRADES: Bitquery API hat keine Raydium-Trades in den letzten 24h gefunden');
+        throw new Error('Keine neuen Raydium-Trades in den letzten 24h verfügbar');
       }
 
-      console.log(`✅ Gefunden: ${filteredTokens.length} neue Raydium Memecoins`);
+      const tokenMap = new Map<string, any>();
+
+      // Gruppiere Trades nach Token und sammle Statistiken
+      trades.forEach((trade: any, index: number) => {
+        try {
+          const address = trade.Trade?.Currency?.MintAddress;
+          const symbol = trade.Trade?.Currency?.Symbol;
+          const name = trade.Trade?.Currency?.Name;
+          const blockTime = trade.Block?.Time;
+          const amountUSD = parseFloat(trade.Trade?.AmountInUSD) || 0;
+          
+          if (!address || !blockTime) {
+            console.warn(`⚠️  Trade ${index} hat unvollständige Daten:`, { address, blockTime, symbol });
+            return;
+          }
+
+          if (!tokenMap.has(address)) {
+            tokenMap.set(address, {
+              address,
+              symbol: symbol || 'UNKNOWN',
+              name: name || 'Unknown Token',
+              firstTradeTime: blockTime,
+              lastTradeTime: blockTime,
+              trades: [],
+              totalVolume: 0,
+              totalTrades: 0,
+              dexProtocols: new Set()
+            });
+          }
+          
+          const token = tokenMap.get(address);
+          token.trades.push(trade);
+          token.totalVolume += amountUSD;
+          token.totalTrades++;
+          token.dexProtocols.add(trade.Trade?.Dex?.ProtocolName);
+          
+          // Update Zeitfenster
+          const tradeTime = new Date(blockTime).getTime();
+          const firstTime = new Date(token.firstTradeTime).getTime();
+          const lastTime = new Date(token.lastTradeTime).getTime();
+          
+          if (tradeTime < firstTime) {
+            token.firstTradeTime = blockTime;
+          }
+          if (tradeTime > lastTime) {
+            token.lastTradeTime = blockTime;
+          }
+        } catch (tradeError) {
+          console.warn(`⚠️  Fehler beim Verarbeiten von Trade ${index}:`, tradeError);
+        }
+      });
+
+      console.log(`🔍 ${tokenMap.size} eindeutige Token gefunden, wende Filter an...`);
+
+      const filteredTokens: BitqueryToken[] = [];
+      
+      // Wende strenge Filter für neue Token an
+      for (const [address, tokenData] of tokenMap.entries()) {
+        try {
+          const firstTradeTime = new Date(tokenData.firstTradeTime).getTime();
+          const ageHours = (Date.now() - firstTradeTime) / (1000 * 60 * 60);
+          const estimatedMarketCap = tokenData.totalVolume * 15; // Konservativere Schätzung
+          const volume24h = tokenData.totalVolume;
+          
+          console.log(`🔍 Prüfe Token ${tokenData.symbol}:`);
+          console.log(`   📅 Alter: ${ageHours.toFixed(2)}h`);
+          console.log(`   💰 Est. MCap: $${estimatedMarketCap.toLocaleString()}`);
+          console.log(`   📊 Volume 24h: $${volume24h.toLocaleString()}`);
+          console.log(`   🔄 Trades: ${tokenData.totalTrades}`);
+          console.log(`   🏦 DEX: ${Array.from(tokenData.dexProtocols).join(', ')}`);
+
+          // Strenge Filter: <24h, >50k MCap, min 30min nach Launch, min 10 Trades
+          if (
+            ageHours <= 24 && 
+            ageHours >= 0.5 && // 30min mindestens
+            estimatedMarketCap >= 50000 && 
+            tokenData.totalTrades >= 10 && // Min 10 echte Trades
+            volume24h >= 5000 // Min $5k Volume
+          ) {
+            console.log(`✅ Token ${tokenData.symbol} QUALIFIZIERT für Backtesting`);
+            
+            try {
+              // Hole echte Preishistorie über Bitquery
+              console.log(`📈 Lade echte Preishistorie für ${tokenData.symbol}...`);
+              const priceHistory = await this.get5MinutePriceHistory(address, firstTradeTime);
+              
+              if (priceHistory.length === 0) {
+                console.warn(`⚠️  Keine Preishistorie für ${tokenData.symbol} verfügbar - überspringe`);
+                continue;
+              }
+
+              // Berechne echte Volatilität aus echten Daten
+              const volatility = this.calculateRealVolatility(priceHistory);
+              const priceChange24h = ((priceHistory[priceHistory.length - 1].close - priceHistory[0].open) / priceHistory[0].open) * 100;
+
+              console.log(`📊 ${tokenData.symbol} Volatilität: ${volatility.toFixed(1)}%, Preisänderung: ${priceChange24h.toFixed(1)}%`);
+
+              filteredTokens.push({
+                address,
+                symbol: tokenData.symbol,
+                name: tokenData.name,
+                marketCap: estimatedMarketCap,
+                volume24h,
+                raydiumLaunchTime: firstTradeTime,
+                age: ageHours,
+                priceHistory,
+                volatility,
+                priceChange24h
+              });
+
+              console.log(`✅ Token ${tokenData.symbol} mit ${priceHistory.length} echten Candles hinzugefügt`);
+
+              // Begrenze auf gewünschte Anzahl
+              if (filteredTokens.length >= limit) {
+                console.log(`🎯 Gewünschte Anzahl von ${limit} Token erreicht`);
+                break;
+              }
+              
+            } catch (historyError) {
+              console.error(`❌ Fehler beim Laden der Preishistorie für ${tokenData.symbol}:`, historyError);
+              // Überspringe Token ohne gültige Historie
+              continue;
+            }
+          } else {
+            console.log(`❌ Token ${tokenData.symbol} NICHT qualifiziert:`);
+            if (ageHours > 24) console.log(`   ❌ Zu alt: ${ageHours.toFixed(2)}h`);
+            if (ageHours < 0.5) console.log(`   ❌ Zu jung: ${ageHours.toFixed(2)}h`);
+            if (estimatedMarketCap < 50000) console.log(`   ❌ MCap zu niedrig: $${estimatedMarketCap.toLocaleString()}`);
+            if (tokenData.totalTrades < 10) console.log(`   ❌ Zu wenig Trades: ${tokenData.totalTrades}`);
+            if (volume24h < 5000) console.log(`   ❌ Volume zu niedrig: $${volume24h.toLocaleString()}`);
+          }
+        } catch (tokenError) {
+          console.error(`❌ Fehler beim Verarbeiten von Token ${address}:`, tokenError);
+          continue;
+        }
+      }
+
+      console.log(`🎯 ERGEBNIS: ${filteredTokens.length} echte neue Raydium-Token <24h mit vollständiger Preishistorie`);
+      
+      if (filteredTokens.length === 0) {
+        console.error('❌ KEINE QUALIFIZIERTEN TOKEN: Alle gefundenen Token erfüllen nicht die Mindestanforderungen');
+        console.error('Anforderungen: <24h alt, >$50k MCap, min 30min nach Launch, min 10 Trades, min $5k Volume');
+        throw new Error('Keine neuen Raydium-Token erfüllen die Mindestanforderungen für echtes Backtesting');
+      }
+
       return filteredTokens;
 
     } catch (error) {
-      console.error('❌ Bitquery Memecoin Discovery Fehler:', error);
-      return [];
+      console.error('❌ BITQUERY TOKEN DISCOVERY FEHLGESCHLAGEN:', error);
+      
+      if (error instanceof Error) {
+        console.error('Error Details:', {
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      
+      throw new Error(`Bitquery neue Token Discovery fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   }
 
   /**
-   * DexScreener Preishistorie
+   * Berechnet echte Volatilität aus echten Bitquery-Preisdaten
    */
-  private async getDexScreenerPriceHistory(tokenAddress: string): Promise<BitqueryPriceData[]> {
-    try {
-      console.log(`📈 Fetching price history from DexScreener for ${tokenAddress.slice(0, 8)}...`);
-      
-      // DexScreener unterstützt keine direkte historische API, verwende echte Memecoin-Patterns
-      return this.generateRealMemecoinHistory({
-        basePrice: 0.00001 + Math.random() * 0.0001,
-        volatilityPattern: [0.8, 1.2, -0.4, 0.6, -0.2, 0.9, -0.3] // Hohe Memecoin-Volatilität
-      });
-    } catch (error) {
-      console.error('DexScreener History Error:', error);
-      return this.generateRealMemecoinHistory({
-        basePrice: 0.00001,
-        volatilityPattern: [0.5, 0.8, -0.3, 0.4, -0.1, 0.6, -0.2]
-      });
+  private calculateRealVolatility(priceHistory: BitqueryPriceData[]): number {
+    if (priceHistory.length < 2) return 0;
+    
+    const returns = [];
+    for (let i = 1; i < priceHistory.length; i++) {
+      const return_ = (priceHistory[i].close - priceHistory[i-1].close) / priceHistory[i-1].close;
+      returns.push(Math.abs(return_));
     }
-  }
-
-  /**
-   * Birdeye Preishistorie
-   */
-  private async getBirdeyePriceHistory(tokenAddress: string): Promise<BitqueryPriceData[]> {
-    try {
-      const apiKey = process.env.BIRDEYE_API_KEY;
-      if (!apiKey) {
-        return this.generateRealMemecoinHistory({
-          basePrice: 0.00001,
-          volatilityPattern: [0.6, 0.9, -0.2, 0.5, -0.15, 0.7, -0.25]
-        });
-      }
-
-      console.log(`📈 Fetching price history from Birdeye for ${tokenAddress.slice(0, 8)}...`);
-      
-      const response = await fetch(`https://public-api.birdeye.so/defi/history_price?address=${tokenAddress}&address_type=token&type=5m&time_from=${Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000)}&time_to=${Math.floor(Date.now() / 1000)}`, {
-        headers: {
-          'X-API-KEY': apiKey,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Birdeye History API Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const priceData = data.data?.items || [];
-
-      if (priceData.length === 0) {
-        return this.generateRealMemecoinHistory({
-          basePrice: 0.00001,
-          volatilityPattern: [0.7, 1.1, -0.35, 0.55, -0.18, 0.75, -0.28]
-        });
-      }
-
-      // Konvertiere Birdeye-Daten zu unserem Format
-      const history: BitqueryPriceData[] = priceData.map((item: any) => ({
-        timestamp: item.unixTime * 1000,
-        open: item.o,
-        high: item.h,
-        low: item.l,
-        close: item.c,
-        volume: item.v || 1000
-      }));
-
-      return history;
-    } catch (error) {
-      console.error('Birdeye History Error:', error);
-      return this.generateRealMemecoinHistory({
-        basePrice: 0.00001,
-        volatilityPattern: [0.6, 0.8, -0.3, 0.45, -0.12, 0.65, -0.22]
-      });
-    }
+    
+    const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    // Annualisierte tägliche Volatilität
+    return avgReturn * 100 * Math.sqrt(288); // 288 = 24h * 12 (5min intervals)
   }
 
   /**
    * Holt 5-Minuten-OHLCV-Daten für einen Token ab dem Launch-Zeitpunkt
+   * NUR ECHTE BITQUERY-DATEN - KEINE MOCK-SIMULATIONEN!
    */
   async get5MinutePriceHistory(
     tokenAddress: string, 
     startTime: number,
-    hours: number = 4 // Reduziere auf 4h für weniger API-Calls
+    hours: number = 24 // Erweitere auf 24h für mehr echte Daten
   ): Promise<BitqueryPriceData[]> {
     
-    // Skip bei Mock-Token
-    if (tokenAddress.startsWith('mock')) {
-      return this.generateRealMemecoinHistory({
-        basePrice: 0.00001 + Math.random() * 0.0001,
-        volatilityPattern: [0.4, 0.6, -0.2, 0.3, -0.1, 0.5, -0.15]
-      });
-    }
-
     const endTime = Math.min(startTime + (hours * 60 * 60 * 1000), Date.now());
 
     const query = `
@@ -648,7 +390,7 @@ export class BitqueryAPI {
               }
             }
             orderBy: { ascending: Block_Time }
-            limit: { count: 50 }
+            limit: { count: 288 } // 24h * 12 (5min Intervalle) = 288 Candles max
           ) {
             Block {
               Time
@@ -656,6 +398,7 @@ export class BitqueryAPI {
             Trade {
               Price
               Amount
+              AmountInUSD
             }
           }
         }
@@ -663,21 +406,26 @@ export class BitqueryAPI {
     `;
 
     try {
-      console.log(`📈 Lade Historie für Token: ${tokenAddress.slice(0, 8)}...`);
+      console.log(`📈 Lade ECHTE Bitquery 5min-Historie für Token: ${tokenAddress.slice(0, 8)}... (${new Date(startTime).toLocaleString()} - ${new Date(endTime).toLocaleString()})`);
       await this.handleRateLimit();
       
       const response = await this.executeQuery(query);
       
-      if (!response?.data?.Solana?.DEXTrades || response.data.Solana.DEXTrades.length === 0) {
-        console.warn(`⚠️  Keine Daten für ${tokenAddress.slice(0, 8)}... - verwende echte Memecoin-Patterns`);
-        return this.generateRealMemecoinHistory({
-          basePrice: 0.00001 + Math.random() * 0.0001,
-          volatilityPattern: [0.5, 0.7, -0.25, 0.35, -0.12, 0.55, -0.18]
-        });
+      if (!response?.data?.Solana?.DEXTrades) {
+        console.error(`❌ BITQUERY API FEHLER: Keine Trade-Daten für ${tokenAddress} erhalten`);
+        throw new Error(`Keine echten Bitquery-Daten für Token ${tokenAddress} verfügbar`);
       }
 
-      // Konvertiere Trade-Daten zu OHLCV-Candles (vereinfacht)
       const trades = response.data.Solana.DEXTrades;
+      
+      if (trades.length === 0) {
+        console.error(`❌ KEINE ECHTEN TRADES: Token ${tokenAddress.slice(0, 8)} hat keine Trade-Historie in Bitquery`);
+        throw new Error(`Token ${tokenAddress} hat keine echte Trade-Historie zwischen ${new Date(startTime).toLocaleString()} und ${new Date(endTime).toLocaleString()}`);
+      }
+
+      console.log(`📊 ${trades.length} ECHTE Bitquery-Trades für ${tokenAddress.slice(0, 8)} gefunden`);
+
+      // Konvertiere Trade-Daten zu OHLCV-Candles (echte Daten!)
       const candles: BitqueryPriceData[] = [];
       
       // Gruppiere Trades in 5-Minuten-Intervalle
@@ -693,12 +441,13 @@ export class BitqueryAPI {
         intervals.get(intervalStart)!.push(trade);
       });
 
-      // Erstelle OHLCV-Candles
+      // Erstelle OHLCV-Candles aus echten Bitquery-Trades
       for (const [intervalStart, intervalTrades] of intervals) {
         if (intervalTrades.length === 0) continue;
         
-        const prices = intervalTrades.map(t => t.Trade.Price);
-        const volumes = intervalTrades.map(t => t.Trade.Amount || 0);
+        const prices = intervalTrades.map(t => parseFloat(t.Trade.Price));
+        const volumes = intervalTrades.map(t => parseFloat(t.Trade.Amount) || 0);
+        const volumesUSD = intervalTrades.map(t => parseFloat(t.Trade.AmountInUSD) || 0);
         
         candles.push({
           timestamp: intervalStart,
@@ -706,22 +455,27 @@ export class BitqueryAPI {
           high: Math.max(...prices),
           low: Math.min(...prices),
           close: prices[prices.length - 1],
-          volume: volumes.reduce((sum, v) => sum + v, 0)
+          volume: Math.max(volumes.reduce((sum, v) => sum + v, 0), volumesUSD.reduce((sum, v) => sum + v, 0))
         });
       }
 
-      console.log(`📊 ${candles.length} Candles für ${tokenAddress.slice(0, 8)}... erstellt`);
-      return candles.length > 0 ? candles : this.generateRealMemecoinHistory({
-        basePrice: 0.00001,
-        volatilityPattern: [0.6, 0.8, -0.3, 0.4, -0.15, 0.6, -0.2]
-      });
+      // Sortiere Candles chronologisch
+      candles.sort((a, b) => a.timestamp - b.timestamp);
+
+      console.log(`✅ ${candles.length} ECHTE 5-Minuten-Candles für ${tokenAddress.slice(0, 8)} erstellt (KEINE MOCK-DATEN)`);
+      
+      if (candles.length === 0) {
+        console.error(`❌ KEINE CANDLES ERSTELLT: Trotz ${trades.length} Trades konnten keine 5min-Candles für ${tokenAddress} erstellt werden`);
+        throw new Error(`Keine 5-Minuten-Candles aus ${trades.length} echten Trades erstellbar`);
+      }
+
+      return candles;
 
     } catch (error) {
       console.error(`❌ Bitquery History Fehler für ${tokenAddress}:`, error);
-      return this.generateRealMemecoinHistory({
-        basePrice: 0.00001 + Math.random() * 0.0001,
-        volatilityPattern: [0.7, 0.9, -0.35, 0.45, -0.18, 0.65, -0.22]
-      });
+      
+      // KEINE Mock-Fallbacks! User will nur echte Daten
+      throw new Error(`Bitquery 5min-Historie für ${tokenAddress} fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   }
 
