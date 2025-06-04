@@ -9,6 +9,7 @@ interface BitquerySimulationResult {
   dailyData: { date: string; value: number }[];
   tokens: BitqueryToken[];
   dataSource: 'bitquery-api';
+  debugLogs: string[];
 }
 
 export default async function handler(
@@ -48,6 +49,24 @@ export default async function handler(
   }
 }
 
+// GLOBALER DEBUG-LOG COLLECTOR
+let debugLogs: string[] = [];
+
+function addDebugLog(message: string) {
+  const timestamp = new Date().toLocaleTimeString();
+  const logMessage = `[${timestamp}] ${message}`;
+  debugLogs.push(logMessage);
+  console.log(logMessage);
+}
+
+function clearDebugLogs() {
+  debugLogs = [];
+}
+
+function getDebugLogs(): string[] {
+  return [...debugLogs];
+}
+
 /**
  * NEUE 7-TAGE TAGESWEISE SIMULATION
  * Jeden Tag neue Token-Auswahl basierend auf aktuellen Kriterien
@@ -57,26 +76,32 @@ async function simulateWithBitqueryData(
   tokenCount: number
 ): Promise<BitquerySimulationResult> {
   
-  console.log('🔍 Starting 7-day progressive simulation...');
+  clearDebugLogs(); // Reset debug logs
+  addDebugLog('🔍 Starting 7-day progressive simulation...');
   
   try {
     const bitqueryAPI = new BitqueryAPI();
     
     // Test API Connection
+    addDebugLog('🧪 Testing Bitquery API connection...');
     const schemaWorking = await bitqueryAPI.testConnection();
     if (!schemaWorking) {
+      addDebugLog('❌ Bitquery API Schema-Test fehlgeschlagen');
       throw new Error('Bitquery API Schema-Test fehlgeschlagen');
     }
+    addDebugLog('✅ Bitquery API connection successful');
     
     // RUN 7-DAY PROGRESSIVE SIMULATION
     const simulationResult = await runSevenDayProgressiveSimulation(bitqueryAPI, botType, tokenCount);
     
     return {
       ...simulationResult,
-      dataSource: 'bitquery-api'
+      dataSource: 'bitquery-api',
+      debugLogs: getDebugLogs()
     };
     
   } catch (error) {
+    addDebugLog(`❌ Simulation failed: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     console.error('❌ Simulation failed:', error);
     throw new Error(`Simulation Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
   }
@@ -96,6 +121,7 @@ async function runSevenDayProgressiveSimulation(
   successRate: number;
   dailyData: { date: string; value: number }[];
   tokens: BitqueryToken[];
+  debugLogs: string[];
 }> {
   
   const startingCapital = 1000; // $1000 Startkapital
@@ -128,9 +154,9 @@ async function runSevenDayProgressiveSimulation(
   
   // QUICK TEST: Teste BitqueryAPI direkt
   try {
-    console.log(`\n🧪 === TESTING BITQUERY API DIRECTLY ===`);
+    addDebugLog(`🧪 === TESTING BITQUERY API DIRECTLY ===`);
     const testDate = new Date(simulationStartDate.getTime() + 3 * 24 * 60 * 60 * 1000); // Tag 4
-    console.log(`Testing token selection for: ${testDate.toISOString().split('T')[0]}`);
+    addDebugLog(`Testing token selection for: ${testDate.toISOString().split('T')[0]}`);
     
     const testTokens = await bitqueryAPI.getTokensEligibleAtDate(testDate, {
       maxAgeHours: 24,
@@ -138,28 +164,28 @@ async function runSevenDayProgressiveSimulation(
       migratedToRaydium: true
     });
     
-    console.log(`🔍 API Test Result: ${testTokens.length} tokens found`);
+    addDebugLog(`🔍 API Test Result: ${testTokens.length} tokens found`);
     if (testTokens.length > 0) {
-      console.log(`✅ First token: ${testTokens[0].symbol} (${testTokens[0].address.slice(0, 8)}...)`);
-      console.log(`   MCap: $${testTokens[0].marketCap.toLocaleString()}, Vol: $${testTokens[0].volume24h.toLocaleString()}`);
+      addDebugLog(`✅ First token: ${testTokens[0].symbol} (${testTokens[0].address.slice(0, 8)}...)`);
+      addDebugLog(`   MCap: $${testTokens[0].marketCap.toLocaleString()}, Vol: $${testTokens[0].volume24h.toLocaleString()}`);
       
       // Test history loading
       const testHistory = await bitqueryAPI.getTokenDayHistory(testTokens[0].address, testDate);
-      console.log(`📊 History Test: ${testHistory.length} candles loaded for ${testTokens[0].symbol}`);
+      addDebugLog(`📊 History Test: ${testHistory.length} candles loaded for ${testTokens[0].symbol}`);
     } else {
-      console.log(`❌ NO TOKENS FOUND - This is the problem!`);
+      addDebugLog(`❌ NO TOKENS FOUND - This is the problem!`);
       
       // Fall back to standard API to check if any tokens exist
-      console.log(`🔄 Testing standard API...`);
+      addDebugLog(`🔄 Testing standard API...`);
       const standardTokens = await bitqueryAPI.getNewRaydiumMemecoins(5);
-      console.log(`📊 Standard API Result: ${standardTokens.length} tokens`);
+      addDebugLog(`📊 Standard API Result: ${standardTokens.length} tokens`);
       
       if (standardTokens.length === 0) {
-        console.log(`❌ EVEN STANDARD API HAS NO TOKENS - BitqueryAPI Problem!`);
+        addDebugLog(`❌ EVEN STANDARD API HAS NO TOKENS - BitqueryAPI Problem!`);
       }
     }
   } catch (testError) {
-    console.error(`❌ BITQUERY API TEST FAILED:`, testError);
+    addDebugLog(`❌ BITQUERY API TEST FAILED: ${testError instanceof Error ? testError.message : 'Unknown error'}`);
   }
   
   console.log(`\n📅 === STARTING DAY-BY-DAY SIMULATION ===`);
@@ -264,7 +290,8 @@ async function runSevenDayProgressiveSimulation(
     tradeCount: totalTrades,
     successRate,
     dailyData: dailyResults,
-    tokens: allTokensUsed
+    tokens: allTokensUsed,
+    debugLogs: getDebugLogs()
   };
 }
 
@@ -765,304 +792,25 @@ function calculateTokenScore(token: BitqueryToken, botType: string): number {
   const liquidityUSD = token.liquidityUSD || 0;
   
   console.log(`📊 Scoring ${token.symbol} for ${botType}:`);
-  console.log(`   Buy Vol: $${buyVol.toLocaleString()}, Sell Vol: $${sellVol.toLocaleString()}`);
-  console.log(`   Traders: ${traders}, Buys: ${buys}, Sells: ${sells}`);
-  console.log(`   Avg Trade Size: $${avgTradeSize.toLocaleString()}, Liquidity: $${liquidityUSD.toLocaleString()}`);
+  console.log(`   MCap Score: ${Math.min(token.marketCap / 100000, 5)}`);
+  console.log(`   Volume Score: ${Math.min(token.volume24h / 50000, 3)}`);
+  console.log(`   Buy Volume: ${buyVol}`);
+  console.log(`   Sell Volume: ${sellVol}`);
+  console.log(`   Traders: ${traders}`);
+  console.log(`   Buys: ${buys}`);
+  console.log(`   Sells: ${sells}`);
+  console.log(`   Avg Trade Size: ${avgTradeSize}`);
+  console.log(`   Liquidity: $${liquidityUSD.toLocaleString()}`);
   
-  // Bot-spezifische Bewertung mit erweiterten Daten
-  switch (botType) {
-    case 'volume-tracker':
-      // Volume-Tracker: Fokus auf Buy-Volume und Trader-Aktivität
-      score += Math.min(buyVol / 25000, 8); // Max 8 Punkte für Buy-Volume
-      score += Math.min(traders / 10, 4); // Max 4 Punkte für Trader-Count
-      score += buys > sells ? 3 : 0; // Bonus für mehr Käufe als Verkäufe
-      score += avgTradeSize > 1000 ? 2 : 0; // Bonus für große durchschnittliche Trades
-      score += token.age && token.age < 2 ? 3 : 1; // Bonus für sehr junge Token
-      console.log(`   Volume-Tracker Score: ${score.toFixed(1)} (buy-focused)`);
-      break;
-      
-    case 'trend-surfer':
-      // Trend-Surfer: Ausgewogenes Buy/Sell-Verhältnis und mittlere Volatilität
-      const buyToSellRatio = sellVol > 0 ? buyVol / sellVol : 1;
-      const balanceScore = buyToSellRatio > 0.5 && buyToSellRatio < 2 ? 4 : 1; // Ausgewogenes Verhältnis
-      score += balanceScore;
-      
-      const volatility = token.volatility || calculateVolatility(token.priceHistory);
-      score += volatility > 20 && volatility < 80 ? 4 : 1; // Mittlere Volatilität
-      score += Math.min(liquidityUSD / 100000, 3); // Liquiditäts-Bonus
-      score += token.marketCap > 100000 ? 2 : 0; // Stabilere Token
-      console.log(`   Trend-Surfer Score: ${score.toFixed(1)} (balance-focused, ratio: ${buyToSellRatio.toFixed(2)})`);
-      break;
-      
-    case 'dip-hunter':
-      // Dip-Hunter: Fokus auf Sell-Pressure und Volatilität
-      const sellPressure = buyVol > 0 ? sellVol / buyVol : 1;
-      score += sellPressure > 1.2 ? 5 : 0; // Bonus für Sell-Pressure (Dip-Opportunity)
-      
-      const recentDip = hasRecentDip(token.priceHistory);
-      score += recentDip ? 5 : 0; // Dip-Bonus
-      
-      const highVolatility = token.volatility || calculateVolatility(token.priceHistory);
-      score += highVolatility > 40 ? 4 : 1; // Hohe Volatilität bevorzugt
-      score += token.marketCap < 200000 ? 3 : 1; // Kleinere MCaps
-      score += avgTradeSize > 500 ? 2 : 0; // Signifikante Trade-Größen
-      console.log(`   Dip-Hunter Score: ${score.toFixed(1)} (dip-focused, sell pressure: ${sellPressure.toFixed(2)})`);
-      break;
-      
-    default:
-      score += 5; // Standard-Score
-      break;
-  }
+  score += Math.min(token.marketCap / 100000, 5);
+  score += Math.min(token.volume24h / 50000, 3);
+  score += Math.min(buyVol, 3);
+  score += Math.min(sellVol, 3);
+  score += Math.min(traders, 3);
+  score += Math.min(buys, 3);
+  score += Math.min(sells, 3);
+  score += Math.min(avgTradeSize, 3);
+  score += Math.min(liquidityUSD / 1000000, 2); // Max 2 Punkte für Liquidity
   
-  console.log(`   Final Score: ${score.toFixed(1)}`);
   return score;
 }
-
-/**
- * Berechnet Volatilität aus Preishistorie
- */
-function calculateVolatility(priceHistory: any[]): number {
-  if (priceHistory.length < 2) return 0;
-  
-  const returns = [];
-  for (let i = 1; i < priceHistory.length; i++) {
-    const return_ = (priceHistory[i].close - priceHistory[i-1].close) / priceHistory[i-1].close;
-    returns.push(return_);
-  }
-  
-  const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
-  
-  return Math.sqrt(variance) * 100; // Als Prozent
-}
-
-/**
- * Prüft auf kürzlichen Dip (>15% in letzten 5 Candles)
- */
-function hasRecentDip(priceHistory: any[]): boolean {
-  if (priceHistory.length < 5) return false;
-  
-  const recent = priceHistory.slice(-5);
-  const maxPrice = Math.max(...recent.map(c => c.high));
-  const minPrice = Math.min(...recent.map(c => c.low));
-  
-  return (maxPrice - minPrice) / maxPrice > 0.15; // >15% Dip
-}
-
-/**
- * Simuliert Bot-Performance basierend auf echten Token-Metadaten (NICHT auf Mock-Preishistorie)
- */
-async function simulateRealBotPerformance(
-  tokens: BitqueryToken[], 
-  botType: string
-): Promise<{
-  profitPercentage: number;
-  tradeCount: number;
-  successRate: number;
-  dailyData: { date: string; value: number }[];
-}> {
-  
-  console.log(`📊 Simulating ${botType} with ${tokens.length} REAL tokens (NO MOCK PRICE DATA)`);
-  console.log(`📊 Token details:`, tokens.map(t => ({ 
-    symbol: t.symbol, 
-    mcap: t.marketCap, 
-    volume: t.volume24h, 
-    age: t.age?.toFixed(1) + 'h',
-    volatility: t.volatility?.toFixed(1) + '%'
-  })));
-  
-  if (tokens.length === 0) {
-    console.warn('⚠️  Keine Token für Performance-Simulation - verwende Standard-Werte');
-    return {
-      profitPercentage: 8.5, // Standard-Performance für Demo
-      tradeCount: 25,
-      successRate: 65,
-      dailyData: generateStandardDailyData()
-    };
-  }
-  
-  // Verwende echte Token-Eigenschaften für Performance-Berechnung
-  let totalTrades = 0;
-  let successfulTrades = 0;
-  let totalProfit = 0;
-  const dailyReturns: { date: string; value: number }[] = [];
-  
-  for (const token of tokens) {
-    console.log(`📈 Calculating performance for ${token.symbol}:`);
-    console.log(`   MCap: $${token.marketCap.toLocaleString()}`);
-    console.log(`   Volume 24h: $${token.volume24h.toLocaleString()}`);
-    console.log(`   Volatility: ${token.volatility?.toFixed(1)}%`);
-    console.log(`   Age: ${token.age?.toFixed(1)}h`);
-    
-    // Berechne Performance basierend auf echten Token-Eigenschaften
-    const tokenPerformance = calculateRealTokenPerformance(token, botType);
-    
-    console.log(`   Trades: ${tokenPerformance.trades}`);
-    console.log(`   Successful: ${tokenPerformance.successful}`);
-    console.log(`   Profit: ${tokenPerformance.profit.toFixed(2)}%`);
-    
-    totalTrades += tokenPerformance.trades;
-    successfulTrades += tokenPerformance.successful;
-    totalProfit += tokenPerformance.profit;
-    
-    // Füge tägliche Returns hinzu
-    tokenPerformance.dailyData.forEach((day, index) => {
-      const existingDay = dailyReturns.find(d => d.date === day.date);
-      if (existingDay) {
-        existingDay.value += day.return;
-      } else {
-        dailyReturns.push({ date: day.date, value: day.return });
-      }
-    });
-  }
-  
-  // Normalisiere tägliche Returns
-  dailyReturns.forEach(day => {
-    day.value = day.value / tokens.length; // Durchschnitt über alle Token
-  });
-  
-  const successRate = totalTrades > 0 ? (successfulTrades / totalTrades) * 100 : 0;
-  const profitPercentage = totalProfit / tokens.length; // Durchschnittlicher Profit
-  
-  console.log(`✅ Real simulation complete:`);
-  console.log(`   Total Trades: ${totalTrades}`);
-  console.log(`   Successful Trades: ${successfulTrades}`);
-  console.log(`   Success Rate: ${successRate.toFixed(1)}%`);
-  console.log(`   Profit Percentage: ${profitPercentage.toFixed(2)}%`);
-  console.log(`   Daily Returns: ${dailyReturns.length} days`);
-  
-  return {
-    profitPercentage,
-    tradeCount: totalTrades,
-    successRate,
-    dailyData: dailyReturns.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  };
-}
-
-/**
- * Generiert Standard-Performance für Demo-Zwecke
- * OHNE MATH.RANDOM - NUR DETERMINISTISCHE WERTE
- */
-function generateStandardDailyData(): { date: string; value: number }[] {
-  const dailyData = [];
-  const daysBack = 7;
-  
-  for (let i = daysBack - 1; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    // DETERMINISTISCHE Berechnung statt Math.random()
-    const dayFactor = (7 - i) / 7; // 0.14 bis 1.0
-    const dailyReturn = 0.5 + (dayFactor * 2); // 0.64% bis 2.5% täglich (linear steigend)
-    
-    dailyData.push({
-      date,
-      value: dailyReturn
-    });
-  }
-  
-  return dailyData;
-}
-
-/**
- * Berechnet Performance basierend auf echten Token-Eigenschaften (NICHT auf Mock-Preisdaten)
- * ANGEPASST: 30% Risiko pro Trade, DETERMINISTISCHE 7-Tage-Simulation (KEIN MATH.RANDOM)
- */
-function calculateRealTokenPerformance(
-  token: BitqueryToken, 
-  botType: string
-): {
-  trades: number;
-  successful: number;
-  profit: number;
-  dailyData: { date: string; return: number }[];
-} {
-  
-  console.log(`🎯 Calculating performance for ${token.symbol} with strategy ${botType} (30% risk per trade)`);
-  
-  // Verwende echte Token-Eigenschaften für Simulation
-  const marketCapFactor = Math.min(token.marketCap / 50000, 5); // MCap-basierte Performance (max 5x)
-  const volumeFactor = Math.min(token.volume24h / 10000, 4); // Volume-basierte Performance (max 4x)
-  const ageFactor = token.age && token.age < 2 ? 3 : (token.age && token.age < 12 ? 2 : 1.5); // Junge Token sind profitabler
-  const volatilityFactor = token.volatility ? Math.min(token.volatility / 20, 3) : 2; // Volatilität = Opportunity
-  
-  console.log(`   Factors: MCap=${marketCapFactor.toFixed(2)}, Volume=${volumeFactor.toFixed(2)}, Age=${ageFactor.toFixed(2)}, Volatility=${volatilityFactor.toFixed(2)}`);
-  
-  let dailyTrades = 0;
-  let baseSuccessRate = 0;
-  let profitPerTrade = 0;
-  const riskPerTrade = 30; // 30% Risiko pro Trade
-  
-  // Bot-spezifische REALISTISCHE Performance-Berechnung mit 30% Risiko
-  switch (botType) {
-    case 'volume-tracker':
-      // Volume-Tracker: Häufige kleine Trades
-      dailyTrades = (volumeFactor * ageFactor * 2) + 1; // 1-10 Trades pro Tag
-      baseSuccessRate = Math.min(0.55 + (volumeFactor * 0.03) + (ageFactor * 0.03), 0.75); // Max 75%
-      profitPerTrade = riskPerTrade * (0.8 + (volatilityFactor * 0.2)); // 24-42% bei Win
-      break;
-      
-    case 'trend-surfer':
-      // Trend-Surfer: Mittlere Frequenz, mittleres Risiko
-      dailyTrades = (volatilityFactor * marketCapFactor * 1.5) + 0.5; // 0.5-7 Trades pro Tag
-      baseSuccessRate = Math.min(0.50 + (marketCapFactor * 0.02) + (volatilityFactor * 0.02), 0.70); // Max 70%
-      profitPerTrade = riskPerTrade * (0.6 + (marketCapFactor * 0.3)); // 18-39% bei Win
-      break;
-      
-    case 'dip-hunter':
-      // Dip-Hunter: Seltene aber große Opportunities
-      dailyTrades = (ageFactor * volatilityFactor * 1.2) + 0.3; // 0.3-8 Trades pro Tag
-      baseSuccessRate = Math.min(0.45 + (ageFactor * 0.05) + (volatilityFactor * 0.02), 0.65); // Max 65%
-      profitPerTrade = riskPerTrade * (1.0 + (ageFactor * 0.4)); // 30-66% bei Win
-      break;
-      
-    default:
-      dailyTrades = 2;
-      baseSuccessRate = 0.6;
-      profitPerTrade = riskPerTrade * 0.8; // 24%
-  }
-  
-  // Realistische 7-Tage-Simulation
-  const totalTrades = Math.floor(dailyTrades * 7); // 7 Tage Laufzeit
-  const successful = Math.floor(totalTrades * baseSuccessRate);
-  const failed = totalTrades - successful;
-  
-  // Kelly-Criterion basierte Gewinn/Verlust-Rechnung
-  const totalProfit = (successful * profitPerTrade) - (failed * riskPerTrade);
-  
-  console.log(`   7-Day Simulation: ${totalTrades} trades total (${(dailyTrades).toFixed(1)}/day)`);
-  console.log(`   Wins: ${successful} (${(baseSuccessRate * 100).toFixed(1)}%), Profit per win: ${profitPerTrade.toFixed(1)}%`);
-  console.log(`   Losses: ${failed}, Loss per trade: ${riskPerTrade}%`);
-  console.log(`   Net 7-day return: ${totalProfit.toFixed(2)}%`);
-  
-  // Generiere tägliche Performance für 7 Tage - DETERMINISTISCHE BERECHNUNG
-  const dailyData = [];
-  let cumulativeReturn = 0;
-  
-  for (let day = 0; day < 7; day++) {
-    const date = new Date(Date.now() - (6 - day) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
-    // DETERMINISTISCHE tägliche Trades basierend auf Token-Eigenschaften
-    const dayProgress = day / 6; // 0 bis 1
-    const volatilityImpact = (volatilityFactor - 1) * 0.2; // -0.2 bis +0.4
-    const tradesThisDay = Math.floor(dailyTrades * (0.8 + dayProgress * 0.4 + volatilityImpact)); // Deterministische Varianz
-    
-    // DETERMINISTISCHE Wins basierend auf Bot-Performance
-    const daySuccessRate = baseSuccessRate * (0.8 + dayProgress * 0.4); // Performance verbessert sich über Zeit
-    const winsThisDay = Math.floor(tradesThisDay * daySuccessRate);
-    const lossesThisDay = tradesThisDay - winsThisDay;
-    
-    const dailyReturn = (winsThisDay * profitPerTrade) - (lossesThisDay * riskPerTrade);
-    cumulativeReturn += dailyReturn;
-    
-    dailyData.push({
-      date,
-      return: dailyReturn
-    });
-  }
-  
-  return {
-    trades: totalTrades,
-    successful,
-    profit: totalProfit,
-    dailyData
-  };
-} 
