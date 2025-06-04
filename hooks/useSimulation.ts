@@ -61,6 +61,14 @@ export const useSimulation = (
         tokenCount: result.tokens?.length || 0
       });
       
+      // ZEIGE DEBUG-LOGS AN
+      if (result.debugLogs && result.debugLogs.length > 0) {
+        console.log(`🐛 DEBUG LOGS for ${botId}:`);
+        result.debugLogs.forEach((log: string) => console.log(`  ${log}`));
+      } else {
+        console.log(`❌ NO DEBUG LOGS in response for ${botId}`);
+      }
+      
       setSimulation({
         profitPercentage: result.profitPercentage,
         tradeCount: result.tradeCount,
