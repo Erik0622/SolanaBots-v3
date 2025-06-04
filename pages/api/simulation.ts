@@ -49,80 +49,37 @@ export default async function handler(
 }
 
 /**
- * Neue Bitquery-basierte Simulation mit robusten Fallback-Strategien
- * Filter: Neue Memecoins nach Raydium Migration, <24h, >50k MCap, 25min nach Launch
+ * Neue Bitquery-basierte Simulation mit echter Bitquery API
+ * Verwendet die ECHTE Bitquery API für Solana-Daten
  */
 async function simulateWithBitqueryData(
   botType: string, 
   tokenCount: number
 ): Promise<BitquerySimulationResult> {
   
-  console.log('🔍 Searching for new Raydium tokens via multiple APIs...');
+  console.log('🔍 Loading REAL Bitquery data for new Raydium tokens...');
   
   try {
-    let tokens: BitqueryToken[] = [];
+    // VERWENDE DIE ECHTE BITQUERY API
+    const bitqueryAPI = new BitqueryAPI();
     
-    // STRATEGIE 1: Versuche DexScreener spezifische Raydium-Endpunkte
-    try {
-      console.log('📡 Trying DexScreener Raydium-specific endpoint...');
-      const dexResponse = await fetch('https://api.dexscreener.com/latest/dex/pairs/raydium', {
-        headers: {
-          'User-Agent': 'SolanaBots/1.0',
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (dexResponse.ok) {
-        const dexData = await dexResponse.json();
-        const pairs = dexData.pairs || [];
-        console.log(`📊 DexScreener Raydium endpoint returned ${pairs.length} pairs`);
-        tokens = processRaydiumPairs(pairs, tokenCount);
-      } else {
-        throw new Error(`DexScreener Raydium API returned ${dexResponse.status}`);
-      }
-    } catch (dexError) {
-      console.warn('⚠️ DexScreener Raydium endpoint failed, trying alternative...');
-      
-      // STRATEGIE 2: Versuche allgemeinen Solana-Endpunkt mit Raydium-Filter
-      try {
-        console.log('📡 Trying DexScreener general Solana endpoint...');
-        const dexResponse = await fetch('https://api.dexscreener.com/latest/dex/pairs/solana', {
-          headers: {
-            'User-Agent': 'SolanaBots/1.0',
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (dexResponse.ok) {
-          const dexData = await dexResponse.json();
-          const pairs = dexData.pairs || [];
-          console.log(`📊 DexScreener Solana endpoint returned ${pairs.length} total pairs`);
-          tokens = processRaydiumPairs(pairs, tokenCount);
-        } else {
-          throw new Error(`DexScreener Solana API returned ${dexResponse.status}`);
-        }
-      } catch (solanaError) {
-        console.warn('⚠️ DexScreener Solana endpoint also failed, using fallback strategy...');
-        
-        // STRATEGIE 3: Statische Token-Liste mit echten Raydium-Token
-        tokens = getFallbackRaydiumTokens(tokenCount);
-      }
-    }
+    console.log('📡 Using Bitquery API for real Solana token data...');
     
-    if (tokens.length === 0) {
-      // STRATEGIE 4: Letzte Backup-Strategie mit bekannten Raydium-Token
-      console.log('🔄 Using backup token strategy...');
-      tokens = getBackupRaydiumTokens(tokenCount);
+    // Hole echte neue Raydium-Token von Bitquery
+    const realTokens = await bitqueryAPI.getNewRaydiumMemecoins(tokenCount);
+    
+    if (realTokens.length === 0) {
+      throw new Error('Keine neuen Raydium-Token von Bitquery API gefunden');
     }
 
-    console.log(`✅ Found ${tokens.length} REAL Raydium tokens for simulation (NO MOCK DATA)`);
+    console.log(`✅ Found ${realTokens.length} REAL Raydium tokens from Bitquery API`);
 
     // Wähle beste Token für Bot-Strategie aus
-    const selectedTokens = selectTokensForBot(tokens, botType, tokenCount);
+    const selectedTokens = selectTokensForBot(realTokens, botType, tokenCount);
     
     console.log(`🎯 Selected ${selectedTokens.length} REAL tokens for ${botType} strategy`);
 
-    // Simuliere Bot-Performance mit echten Token-Daten (ohne Mock-Preishistorie)
+    // Simuliere Bot-Performance mit echten Token-Daten
     const performance = await simulateRealBotPerformance(selectedTokens, botType);
 
     return {
@@ -132,135 +89,9 @@ async function simulateWithBitqueryData(
     };
     
   } catch (error) {
-    console.error('❌ All API strategies failed, using emergency fallback:', error);
-    
-    // NOTFALL-STRATEGIE: Verwende vordefinierte Token-Liste
-    const emergencyTokens = getEmergencyRaydiumTokens(tokenCount);
-    const selectedTokens = selectTokensForBot(emergencyTokens, botType, tokenCount);
-    const performance = await simulateRealBotPerformance(selectedTokens, botType);
-    
-    return {
-      ...performance,
-      tokens: selectedTokens,
-      dataSource: 'bitquery-api'
-    };
+    console.error('❌ Bitquery API failed:', error);
+    throw new Error(`Bitquery API Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
   }
-}
-
-/**
- * Verarbeitet Raydium-Pairs aus DexScreener-Daten
- */
-function processRaydiumPairs(pairs: any[], tokenCount: number): BitqueryToken[] {
-  const now = Date.now();
-  
-  return pairs
-    .filter((pair: any) => {
-      if (!pair) return false;
-      
-      const mcap = parseFloat(pair.fdv || pair.marketCap || '0');
-      const volume = parseFloat(pair.volume?.h24 || '0');
-      
-      const isRaydium = pair.dexId === 'raydium' || pair.dexId?.includes('raydium');
-      const isSolana = pair.chainId === 'solana';
-      const hasGoodVolume = volume > 1000; // Reduzierter Mindestvolume
-      const hasValidMcap = mcap > 10000; // Reduzierte MCap-Anforderung
-      
-      return isRaydium && isSolana && hasGoodVolume && hasValidMcap;
-    })
-    .sort((a: any, b: any) => parseFloat(b.volume?.h24 || '0') - parseFloat(a.volume?.h24 || '0'))
-    .slice(0, tokenCount * 2)
-    .map((pair: any) => ({
-      address: pair.baseToken?.address || `raydium-${Math.random().toString(36).substr(2, 9)}`,
-      symbol: pair.baseToken?.symbol || 'UNKNOWN',
-      name: pair.baseToken?.name || 'Unknown Token',
-      marketCap: parseFloat(pair.fdv || pair.marketCap || '50000'),
-      volume24h: parseFloat(pair.volume?.h24 || '10000'),
-      raydiumLaunchTime: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).getTime() : now - 24 * 60 * 60 * 1000,
-      age: pair.pairCreatedAt ? (now - new Date(pair.pairCreatedAt).getTime()) / (1000 * 60 * 60) : 12,
-      priceHistory: [] // KEINE MOCK-DATEN! Nur echte Token-Metadaten
-    }));
-}
-
-/**
- * Fallback-Strategie: Bekannte aktive Raydium-Token
- */
-function getFallbackRaydiumTokens(tokenCount: number): BitqueryToken[] {
-  const now = Date.now();
-  
-  const knownTokens = [
-    { symbol: 'BONK', name: 'Bonk', mcap: 2500000, volume: 150000 },
-    { symbol: 'WIF', name: 'dogwifhat', mcap: 3200000, volume: 200000 },
-    { symbol: 'PEPE', name: 'Pepe', mcap: 1800000, volume: 120000 },
-    { symbol: 'SHIB', name: 'Shiba Inu', mcap: 4500000, volume: 300000 },
-    { symbol: 'DOGE', name: 'Dogecoin', mcap: 12000000, volume: 500000 },
-    { symbol: 'FLOKI', name: 'FLOKI', mcap: 1200000, volume: 80000 },
-    { symbol: 'SAMO', name: 'Samoyedcoin', mcap: 800000, volume: 60000 },
-    { symbol: 'COPE', name: 'Cope', mcap: 600000, volume: 45000 },
-    { symbol: 'FIDA', name: 'Bonfida', mcap: 900000, volume: 70000 },
-    { symbol: 'RAY', name: 'Raydium', mcap: 5000000, volume: 400000 }
-  ];
-  
-  return knownTokens
-    .slice(0, tokenCount)
-    .map((token, index) => ({
-      address: `raydium-fallback-${index}`,
-      symbol: token.symbol,
-      name: token.name,
-      marketCap: token.mcap * (0.8 + Math.random() * 0.4), // Varianz
-      volume24h: token.volume * (0.7 + Math.random() * 0.6), // Varianz
-      raydiumLaunchTime: now - Math.random() * 48 * 60 * 60 * 1000, // Letzte 48h
-      age: Math.random() * 48, // 0-48 Stunden
-      priceHistory: []
-    }));
-}
-
-/**
- * Backup-Strategie: Zusätzliche Token-Liste
- */
-function getBackupRaydiumTokens(tokenCount: number): BitqueryToken[] {
-  const now = Date.now();
-  
-  const backupTokens = [
-    { symbol: 'MYRO', name: 'Myro', mcap: 750000, volume: 55000 },
-    { symbol: 'POPCAT', name: 'Popcat', mcap: 1100000, volume: 75000 },
-    { symbol: 'MEW', name: 'cat in a dogs world', mcap: 650000, volume: 48000 },
-    { symbol: 'BOOK', name: 'Book of Meme', mcap: 850000, volume: 62000 },
-    { symbol: 'SLERF', name: 'Slerf', mcap: 420000, volume: 35000 },
-    { symbol: 'BOME', name: 'BOOK OF MEME', mcap: 780000, volume: 58000 },
-    { symbol: 'SMOLE', name: 'Smole', mcap: 320000, volume: 28000 },
-    { symbol: 'PONKE', name: 'PonkeToken', mcap: 450000, volume: 38000 }
-  ];
-  
-  return backupTokens
-    .slice(0, tokenCount)
-    .map((token, index) => ({
-      address: `raydium-backup-${index}`,
-      symbol: token.symbol,
-      name: token.name,
-      marketCap: token.mcap * (0.9 + Math.random() * 0.2),
-      volume24h: token.volume * (0.8 + Math.random() * 0.4),
-      raydiumLaunchTime: now - Math.random() * 24 * 60 * 60 * 1000, // Letzte 24h
-      age: Math.random() * 24, // 0-24 Stunden
-      priceHistory: []
-    }));
-}
-
-/**
- * Notfall-Strategie: Minimale Token-Liste
- */
-function getEmergencyRaydiumTokens(tokenCount: number): BitqueryToken[] {
-  const now = Date.now();
-  
-  return Array.from({ length: tokenCount }, (_, index) => ({
-    address: `emergency-token-${index}`,
-    symbol: `EMG${index + 1}`,
-    name: `Emergency Token ${index + 1}`,
-    marketCap: 100000 * (1 + Math.random() * 5),
-    volume24h: 20000 * (1 + Math.random() * 3),
-    raydiumLaunchTime: now - Math.random() * 12 * 60 * 60 * 1000, // Letzte 12h
-    age: Math.random() * 12, // 0-12 Stunden
-    priceHistory: []
-  }));
 }
 
 /**
@@ -303,7 +134,7 @@ function calculateTokenScore(token: BitqueryToken, botType: string): number {
       
     case 'trend-surfer':
       // Trend-Surfer mag mittlere Volatilität
-      const volatility = calculateVolatility(token.priceHistory);
+      const volatility = token.volatility || calculateVolatility(token.priceHistory);
       score += volatility > 20 && volatility < 80 ? 4 : 1;
       score += token.marketCap > 100000 ? 2 : 0; // Stabilere Token
       break;
