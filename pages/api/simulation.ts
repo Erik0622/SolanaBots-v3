@@ -120,7 +120,49 @@ async function runSevenDayProgressiveSimulation(
   const simulationEndDate = new Date();
   const simulationStartDate = new Date(simulationEndDate.getTime() - 7 * 24 * 60 * 60 * 1000);
   
-  console.log(`📅 Simulation Period: ${simulationStartDate.toISOString().split('T')[0]} bis ${simulationEndDate.toISOString().split('T')[0]}`);
+  console.log(`\n🎯 === 7-DAY PROGRESSIVE SIMULATION START ===`);
+  console.log(`Bot Type: ${botType}`);
+  console.log(`Max Tokens per Day: ${maxTokensPerDay}`);
+  console.log(`Starting Capital: $${startingCapital}`);
+  console.log(`Simulation Period: ${simulationStartDate.toISOString().split('T')[0]} bis ${simulationEndDate.toISOString().split('T')[0]}`);
+  
+  // QUICK TEST: Teste BitqueryAPI direkt
+  try {
+    console.log(`\n🧪 === TESTING BITQUERY API DIRECTLY ===`);
+    const testDate = new Date(simulationStartDate.getTime() + 3 * 24 * 60 * 60 * 1000); // Tag 4
+    console.log(`Testing token selection for: ${testDate.toISOString().split('T')[0]}`);
+    
+    const testTokens = await bitqueryAPI.getTokensEligibleAtDate(testDate, {
+      maxAgeHours: 24,
+      minMarketCap: 50000,
+      migratedToRaydium: true
+    });
+    
+    console.log(`🔍 API Test Result: ${testTokens.length} tokens found`);
+    if (testTokens.length > 0) {
+      console.log(`✅ First token: ${testTokens[0].symbol} (${testTokens[0].address.slice(0, 8)}...)`);
+      console.log(`   MCap: $${testTokens[0].marketCap.toLocaleString()}, Vol: $${testTokens[0].volume24h.toLocaleString()}`);
+      
+      // Test history loading
+      const testHistory = await bitqueryAPI.getTokenDayHistory(testTokens[0].address, testDate);
+      console.log(`📊 History Test: ${testHistory.length} candles loaded for ${testTokens[0].symbol}`);
+    } else {
+      console.log(`❌ NO TOKENS FOUND - This is the problem!`);
+      
+      // Fall back to standard API to check if any tokens exist
+      console.log(`🔄 Testing standard API...`);
+      const standardTokens = await bitqueryAPI.getNewRaydiumMemecoins(5);
+      console.log(`📊 Standard API Result: ${standardTokens.length} tokens`);
+      
+      if (standardTokens.length === 0) {
+        console.log(`❌ EVEN STANDARD API HAS NO TOKENS - BitqueryAPI Problem!`);
+      }
+    }
+  } catch (testError) {
+    console.error(`❌ BITQUERY API TEST FAILED:`, testError);
+  }
+  
+  console.log(`\n📅 === STARTING DAY-BY-DAY SIMULATION ===`);
   
   // TAG FÜR TAG SIMULATION
   for (let day = 0; day < 7; day++) {
