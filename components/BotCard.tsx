@@ -4,6 +4,7 @@ import React, { FC, useState, useEffect } from 'react';
 import { useFavoriteBots } from '@/hooks/useFavoriteBots';
 import { saveBotRisk } from '@/lib/botState';
 import Link from 'next/link';
+import { useSimulation } from '@/hooks/useSimulation';
 
 interface BotCardProps {
   id: string;
@@ -54,6 +55,15 @@ const BotCard: FC<BotCardProps> = ({
   const { isBotFavorite, toggleFavorite } = useFavoriteBots();
   const [isHovered, setIsHovered] = useState(false);
 
+  const { simulation, isLoading: simulationLoading } = useSimulation(id, false, true, true);
+  
+  const performanceData = simulation.dailyData.length > 0 
+    ? simulation.dailyData.slice(-7).map((day, index) => ({
+        day: index + 1,
+        value: day.value
+      }))
+    : [];
+
   useEffect(() => {
     setCurrentRisk(baseRiskPerTrade);
   }, [baseRiskPerTrade]);
@@ -86,12 +96,6 @@ const BotCard: FC<BotCardProps> = ({
     if (risk <= 20) return 'Medium Risk';
     return 'High Risk';
   };
-
-  // Mock performance data for mini chart
-  const performanceData = Array.from({ length: 7 }, (_, i) => ({
-    day: i + 1,
-    value: Math.random() * 10 + 5
-  }));
 
   return (
     <div 
@@ -143,19 +147,39 @@ const BotCard: FC<BotCardProps> = ({
       {/* Mini Performance Chart */}
       <div className="relative z-10 mb-4">
         <div className="h-16 bg-white/5 rounded-xl p-2 border border-white/10">
-          <div className="flex items-end justify-between h-full">
-            {performanceData.map((point, index) => (
-              <div
-                key={index}
-                className="bg-gradient-to-t from-primary to-primary/50 rounded-sm transition-all duration-300 hover:from-secondary hover:to-secondary/50"
-                style={{ 
-                  height: `${(point.value / 15) * 100}%`,
-                  width: `${100 / performanceData.length - 2}%`
-                }}
-              />
-            ))}
-          </div>
+          {simulationLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            </div>
+          ) : performanceData.length > 0 ? (
+            <div className="flex items-end justify-between h-full">
+              {performanceData.map((point, index) => {
+                // Normalisiere Werte für Anzeige (0-100 wird zu 0-15 für Chart-Höhe)
+                const normalizedValue = Math.max(0, Math.min(15, (point.value / 100) * 15));
+                return (
+                  <div
+                    key={index}
+                    className="bg-gradient-to-t from-primary to-primary/50 rounded-sm transition-all duration-300 hover:from-secondary hover:to-secondary/50"
+                    style={{ 
+                      height: `${Math.max(5, (normalizedValue / 15) * 100)}%`, // Min 5% Höhe für Sichtbarkeit
+                      width: `${100 / performanceData.length - 2}%`
+                    }}
+                    title={`Tag ${point.day}: ${point.value.toFixed(1)}%`}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-white/40 text-xs">
+              Keine Daten verfügbar
+            </div>
+          )}
         </div>
+        {performanceData.length > 0 && (
+          <div className="text-xs text-white/40 mt-1 text-center">
+            Letzte 7 Tage Performance
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
