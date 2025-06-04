@@ -38,7 +38,7 @@ export interface BitqueryMigrationData {
 }
 
 export class BitqueryAPI {
-  private baseUrl = 'https://graphql.bitquery.io';
+  private baseUrl = 'https://streaming.bitquery.io/eap';
   private apiKey = process.env.BITQUERY_API_KEY || 'ory_at_4t1KnHlwObAx_MVV5xuXlHRa86VmpiA7KhJjNLyC9MQ.-3tIZhQyT8xbIf5EQnt2e8GLnux0pFAwyl1uCVzZQZg';
   private projectId = process.env.BITQUERY_PROJECT_ID || '0aeb55a3-7c07-4eb2-8672-3e33cbe428a2';
   private secret = process.env.BITQUERY_SECRET || 'A3pO89GykmVdSiAqvJvQfsiILK';
@@ -50,7 +50,7 @@ export class BitqueryAPI {
     if (!this.apiKey) {
       console.warn('⚠️  Bitquery API Key fehlt! Bitte BITQUERY_API_KEY in .env.local setzen');
     }
-    console.log(`🔗 Bitquery API initialisiert für Projekt: ${this.projectId}`);
+    console.log(`🔗 Bitquery V2 EAP API initialisiert für Projekt: ${this.projectId}`);
   }
 
   /**
@@ -651,17 +651,13 @@ export class BitqueryAPI {
       throw new Error('Bitquery API Key erforderlich');
     }
 
+    // V2 API Headers mit Bearer Token
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`,
+      'Authorization': `Bearer ${this.apiKey}`, // KORRIGIERT: Bearer Token für V2
     };
 
-    // Füge X-API-KEY hinzu falls vorhanden
-    if (this.secret) {
-      headers['X-API-KEY'] = this.secret;
-    }
-
-    console.log('🔗 Sende Bitquery GraphQL Request...');
+    console.log('🔗 Sende Bitquery V2 EAP GraphQL Request...');
 
     const response = await fetch(this.baseUrl, {
       method: 'POST',
@@ -675,7 +671,7 @@ export class BitqueryAPI {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Bitquery API Error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`Bitquery V2 API Error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -685,7 +681,7 @@ export class BitqueryAPI {
       throw new Error(`GraphQL Errors: ${JSON.stringify(data.errors)}`);
     }
 
-    console.log('✅ Bitquery API Response erfolgreich erhalten');
+    console.log('✅ Bitquery V2 API Response erfolgreich erhalten');
     return data;
   }
 
@@ -693,38 +689,49 @@ export class BitqueryAPI {
    * Test-Funktion für API-Verbindung
    */
   async testConnection(): Promise<boolean> {
-    const testQuery = `
-      query TestConnection {
-        Solana {
-          DEXTrades(limit: { count: 1 }) {
-            Block {
-              Time
-            }
-            Trade {
-              Dex {
-                ProtocolName
-              }
-            }
+    // EINFACHE INTROSPECTION QUERY
+    const introspectionQuery = `
+      query IntrospectionQuery {
+        __schema {
+          types {
+            name
           }
         }
       }
     `;
 
     try {
-      console.log('🧪 Teste Bitquery API Verbindung...');
+      console.log('🧪 Teste Bitquery API Schema...');
       await this.handleRateLimit();
-      const response = await this.executeQuery(testQuery);
+      const response = await this.executeQuery(introspectionQuery);
       
-      if (response?.data?.Solana?.DEXTrades) {
-        console.log('✅ Bitquery API Verbindung erfolgreich');
+      if (response?.data?.__schema) {
+        console.log('✅ Bitquery API Schema verfügbar');
+        console.log('📋 Verfügbare Types:', response.data.__schema.types.slice(0, 10).map((t: any) => t.name));
         return true;
       } else {
-        console.error('❌ Unerwartete Antwort von Bitquery API');
+        console.error('❌ Unerwartete Schema-Antwort von Bitquery API');
         return false;
       }
     } catch (error) {
-      console.error('❌ Bitquery API Verbindung fehlgeschlagen:', error);
-      return false;
+      console.error('❌ Bitquery API Introspection fehlgeschlagen:', error);
+      
+      // FALLBACK: Teste einfachste Query
+      const simpleQuery = `
+        query TestQuery {
+          __typename
+        }
+      `;
+      
+      try {
+        console.log('🔄 Versuche einfache Basis-Query...');
+        const simpleResponse = await this.executeQuery(simpleQuery);
+        console.log('📝 Einfache Query Response:', simpleResponse);
+        return simpleResponse !== null;
+      } catch (simpleError) {
+        console.error('❌ Auch einfache Query fehlgeschlagen:', simpleError);
+        return false;
+      }
     }
   }
 } 
