@@ -1039,32 +1039,33 @@ export class BitqueryAPI {
     }
   ): Promise<BitqueryToken[]> {
     
-    console.log(`🔍 Searching for tokens eligible on ${targetDate.toISOString().split('T')[0]}`);
-    console.log(`   Criteria: <${criteria.maxAgeHours}h old, >$${criteria.minMarketCap} MCap, Raydium: ${criteria.migratedToRaydium}`);
+    console.log(`🔍 Searching for tokens that were <${criteria.maxAgeHours}h old on ${targetDate.toISOString().split('T')[0]}`);
+    console.log(`   Looking for tokens created between ${new Date(targetDate.getTime() - criteria.maxAgeHours * 60 * 60 * 1000).toISOString().split('T')[0]} and ${targetDate.toISOString().split('T')[0]}`);
     
-    const targetDateStr = targetDate.toISOString();
-    const maxAgeDateStr = new Date(targetDate.getTime() - criteria.maxAgeHours * 60 * 60 * 1000).toISOString();
+    // KORRIGIERTE LOGIK: Suche Token die VOR dem targetDate erstellt wurden
+    const tokenCreationWindowStart = new Date(targetDate.getTime() - criteria.maxAgeHours * 60 * 60 * 1000);
+    const tokenCreationWindowEnd = targetDate;
     
     const query = `
-      query TokensEligibleAtDate {
+      query TokensCreatedBeforeDate {
         Solana {
           DEXTradeByTokens(
             where: {
               Block: { 
                 Time: { 
-                  between: ["${targetDateStr.split('T')[0]}T00:00:00Z", "${targetDateStr.split('T')[0]}T23:59:59Z"]
+                  between: ["${tokenCreationWindowStart.toISOString()}", "${tokenCreationWindowEnd.toISOString()}"]
                 }
               }
               Trade: {
                 Dex: { 
                   ProtocolFamily: { in: ["Raydium"] }
                 }
-                AmountInUSD: { gt: 100 } # Mindest-Trade-Größe
+                AmountInUSD: { gt: 50 } # Niedrigere Schwelle für historische Daten
               }
               Transaction: { Result: { Success: true } }
             }
-            orderBy: { descending: count }
-            limit: { count: 50 }
+            orderBy: { descending: totalVolume }
+            limit: { count: 100 }
           ) {
             Trade {
               Currency {
@@ -1099,7 +1100,7 @@ export class BitqueryAPI {
       const response = await this.executeQuery(query);
       
       if (!response?.data?.Solana?.DEXTradeByTokens) {
-        console.warn(`⚠️  No token data found for ${targetDate.toISOString().split('T')[0]}`);
+        console.warn(`⚠️  No token data found for creation window ${tokenCreationWindowStart.toISOString().split('T')[0]} - ${tokenCreationWindowEnd.toISOString().split('T')[0]}`);
         return [];
       }
 
@@ -1117,44 +1118,59 @@ export class BitqueryAPI {
         tokenGroups.get(tokenAddress)!.push(trade);
       }
       
-      console.log(`📊 Found ${tokenGroups.size} unique tokens on ${targetDate.toISOString().split('T')[0]}`);
+      console.log(`📊 Found ${tokenGroups.size} unique tokens created in window`);
       
       for (const [tokenAddress, tokenTrades] of tokenGroups.entries()) {
         try {
-          // Berechne Token-Metriken für diesen Tag
+          // Finde den ersten Trade (= Token-Erstellung)
+          const sortedTrades = tokenTrades.sort((a, b) => 
+            new Date(a.Block.Time).getTime() - new Date(b.Block.Time).getTime()
+          );
+          const firstTrade = sortedTrades[0];
+          const tokenCreationTime = new Date(firstTrade.Block.Time);
+          
+          // Berechne Token-Alter zum Simulation-Zeitpunkt
+          const tokenAgeAtSimulation = (targetDate.getTime() - tokenCreationTime.getTime()) / (1000 * 60 * 60); // in Stunden
+          
+          // Prüfe Alters-Kriterium
+          if (tokenAgeAtSimulation > criteria.maxAgeHours) {
+            console.log(`❌ ${firstTrade.Trade.Currency.Symbol}: Too old (${tokenAgeAtSimulation.toFixed(1)}h > ${criteria.maxAgeHours}h)`);
+            continue;
+          }
+          
+          // Berechne Token-Metriken für das gesamte Zeitfenster
           const totalVolume = tokenTrades.reduce((sum, t) => sum + (t.totalVolume || 0), 0);
           const buyVolume = tokenTrades.reduce((sum, t) => sum + (t.buyVolume || 0), 0);
           const sellVolume = tokenTrades.reduce((sum, t) => sum + (t.sellVolume || 0), 0);
           const avgPrice = tokenTrades.reduce((sum, t) => sum + (t.avgPrice || 0), 0) / tokenTrades.length;
           const uniqueTraders = Math.max(...tokenTrades.map(t => t.uniqueTraders || 0));
           
-          // Schätze Market Cap (vereinfacht)
-          const estimatedMarketCap = totalVolume * 5; // Volume * 5 als MCap-Schätzung
+          // Schätze Market Cap basierend auf Volume
+          const estimatedMarketCap = Math.max(totalVolume * 3, avgPrice * 1000000); // Konservative Schätzung
           
-          // Prüfe Kriterien
+          // Prüfe Market Cap-Kriterium
           if (estimatedMarketCap < criteria.minMarketCap) {
-            continue; // Zu niedrige Market Cap
+            console.log(`❌ ${firstTrade.Trade.Currency.Symbol}: MCap too low ($${estimatedMarketCap.toLocaleString()} < $${criteria.minMarketCap.toLocaleString()})`);
+            continue;
           }
-          
-          const firstTrade = tokenTrades[0].Trade;
           
           const token: BitqueryToken = {
             address: tokenAddress,
-            symbol: firstTrade.Currency.Symbol || `TOKEN_${tokenAddress.slice(0, 6)}`,
-            name: firstTrade.Currency.Name || `Token ${tokenAddress.slice(0, 8)}`,
+            symbol: firstTrade.Trade.Currency.Symbol || `TOKEN_${tokenAddress.slice(0, 6)}`,
+            name: firstTrade.Trade.Currency.Name || `Token ${tokenAddress.slice(0, 8)}`,
             marketCap: estimatedMarketCap,
             volume24h: totalVolume,
-            raydiumLaunchTime: new Date(tokenTrades[0].Block.Time).getTime(),
-            age: (targetDate.getTime() - new Date(tokenTrades[0].Block.Time).getTime()) / (1000 * 60 * 60), // in Stunden
+            raydiumLaunchTime: tokenCreationTime.getTime(),
+            age: tokenAgeAtSimulation,
             priceHistory: [], // Wird später geladen
             buyVolume,
             sellVolume,
             tradersCount: uniqueTraders,
             priceUsd: avgPrice,
             dexInfo: {
-              protocolFamily: firstTrade.Dex.ProtocolFamily,
-              protocolName: firstTrade.Dex.ProtocolName,
-              programAddress: firstTrade.Dex.ProgramAddress
+              protocolFamily: firstTrade.Trade.Dex.ProtocolFamily,
+              protocolName: firstTrade.Trade.Dex.ProtocolName,
+              programAddress: firstTrade.Trade.Dex.ProgramAddress
             },
             tradeStats: {
               buys: tokenTrades.reduce((sum, t) => sum + (t.buyTrades || 0), 0),
@@ -1164,11 +1180,8 @@ export class BitqueryAPI {
             }
           };
           
-          // Prüfe Alters-Kriterium
-          if (token.age <= criteria.maxAgeHours) {
-            tokens.push(token);
-            console.log(`✅ ${token.symbol}: MCap $${token.marketCap.toLocaleString()}, Age ${token.age.toFixed(1)}h, Vol $${token.volume24h.toLocaleString()}`);
-          }
+          tokens.push(token);
+          console.log(`✅ ${token.symbol}: MCap $${token.marketCap.toLocaleString()}, Age ${token.age.toFixed(1)}h, Vol $${token.volume24h.toLocaleString()}`);
           
         } catch (error) {
           console.error(`❌ Error processing token ${tokenAddress}:`, error);
@@ -1178,7 +1191,7 @@ export class BitqueryAPI {
       // Sortiere nach Volume (höchstes zuerst)
       tokens.sort((a, b) => b.volume24h - a.volume24h);
       
-      console.log(`🎯 ${tokens.length} tokens met criteria for ${targetDate.toISOString().split('T')[0]}`);
+      console.log(`🎯 ${tokens.length} tokens met criteria for simulation date ${targetDate.toISOString().split('T')[0]}`);
       return tokens.slice(0, 20); // Max 20 Token
       
     } catch (error) {
