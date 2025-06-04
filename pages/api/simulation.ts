@@ -63,6 +63,20 @@ async function simulateWithBitqueryData(
     // VERWENDE DIE ECHTE BITQUERY API
     const bitqueryAPI = new BitqueryAPI();
     
+    console.log('📡 Testing Bitquery API schema first...');
+    
+    // TESTE SCHEMA ZUERST
+    const schemaWorking = await bitqueryAPI.testConnection();
+    console.log(`📊 Schema test result: ${schemaWorking}`);
+    
+    if (!schemaWorking) {
+      throw new Error('Bitquery API Schema-Test fehlgeschlagen - API nicht erreichbar');
+    }
+    
+    // DEBUG: Teste einfache Raydium-Abfrage
+    console.log('🐛 Running Raydium debug test...');
+    await bitqueryAPI.debugRaydiumData();
+    
     console.log('📡 Using Bitquery API for real Solana token data...');
     
     // Hole echte neue Raydium-Token von Bitquery
