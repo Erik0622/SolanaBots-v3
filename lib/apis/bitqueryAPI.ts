@@ -184,6 +184,197 @@ export class BitqueryAPI {
   }
 
   /**
+   * NEUE FUNKTION: Findet frische Token die neu zu Raydium migriert sind
+   * Filter: < 24h alt, > 50k Market Cap, echte Memecoin-Token
+   */
+  async getFreshRaydiumTokens(maxAgeHours: number = 24, minMarketCap: number = 50000): Promise<RaydiumTrade[]> {
+    try {
+      console.log(`🔍 Suche frische Raydium-Token (< ${maxAgeHours}h alt, > $${minMarketCap.toLocaleString()} MCap)...`);
+      
+      await this.handleRateLimit();
+      
+      // Suche nach neuen Pairs über verschiedene populäre Quoting-Token
+      const quotingTokens = ['So11111111111111111111111111111111111111112', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v']; // SOL, USDC
+      const allFreshTokens: RaydiumTrade[] = [];
+      
+      for (const quotingToken of quotingTokens) {
+        try {
+          console.log(`🔍 Lade ${quotingToken === 'So11111111111111111111111111111111111111112' ? 'SOL' : 'USDC'}-Pairs...`);
+          await this.handleRateLimit();
+          
+          const response = await axios.get(`https://api.dexscreener.com/token-pairs/v1/solana/${quotingToken}`, {
+            timeout: 15000,
+            headers: {
+              'User-Agent': 'Solana-Trading-Bot/1.0'
+            }
+          });
+
+          if (Array.isArray(response.data)) {
+            // Filter für frische Raydium-Pairs
+            const freshPairs = response.data.filter((pair: any) => {
+              const isRaydium = pair.dexId === 'raydium';
+              const hasPrice = pair.priceUsd && parseFloat(pair.priceUsd) > 0;
+              const hasLiquidity = pair.liquidity?.usd && parseFloat(pair.liquidity.usd) >= minMarketCap;
+              const hasVolume = pair.volume?.h24 && parseFloat(pair.volume.h24) > 1000; // Min $1k Volume
+              const hasTokens = pair.baseToken && pair.quoteToken;
+              
+              // Age Check: Pair Creation Date
+              const pairCreatedAt = pair.pairCreatedAt ? new Date(pair.pairCreatedAt) : null;
+              const isRecent = pairCreatedAt ? 
+                (Date.now() - pairCreatedAt.getTime()) < (maxAgeHours * 60 * 60 * 1000) : 
+                false;
+              
+              // Additional filters for real memecoins
+              const isNotStablecoin = !['USDC', 'USDT', 'DAI', 'BUSD'].includes(pair.baseToken?.symbol?.toUpperCase());
+              const isNotMajorToken = !['SOL', 'BTC', 'ETH', 'BNB'].includes(pair.baseToken?.symbol?.toUpperCase());
+              
+              return isRaydium && hasPrice && hasLiquidity && hasVolume && hasTokens && 
+                     isRecent && isNotStablecoin && isNotMajorToken;
+            });
+
+            console.log(`📊 ${quotingToken.slice(0, 4)}...: ${freshPairs.length} frische Pairs gefunden`);
+            
+            // Konvertiere zu Trading-Format
+            const freshTokenData = freshPairs.map((pair: any): RaydiumTrade => {
+              const buys = parseInt(pair.txns?.h24?.buys || '0');
+              const sells = parseInt(pair.txns?.h24?.sells || '0');
+              const estimatedMarketCap = parseFloat(pair.liquidity?.usd || '0') * 2; // Estimate MCap from liquidity
+              
+              return {
+                tokenAddress: pair.baseToken.address,
+                tokenName: pair.baseToken.name || 'Unknown Token',
+                tokenSymbol: pair.baseToken.symbol || 'UNKNOWN',
+                priceUSD: parseFloat(pair.priceUsd || '0'),
+                volumeUSD24h: parseFloat(pair.volume?.h24 || '0'),
+                priceChange24h: parseFloat(pair.priceChange?.h24 || '0'),
+                liquidityUSD: parseFloat(pair.liquidity?.usd || '0'),
+                trades24h: buys + sells,
+                timestamp: pair.pairCreatedAt || new Date().toISOString(),
+              };
+            });
+            
+            allFreshTokens.push(...freshTokenData);
+          }
+        } catch (quotingError) {
+          console.error(`❌ Fehler bei ${quotingToken}-Pairs:`, quotingError instanceof Error ? quotingError.message : 'Unbekannt');
+        }
+      }
+      
+      // Deduplizierung und Filterung
+      const uniqueFreshTokens = allFreshTokens.filter((token, index, self) => 
+        index === self.findIndex(t => t.tokenAddress === token.tokenAddress)
+      );
+      
+      // Zusätzlicher Market Cap Filter basierend auf Liquidität
+      const filteredTokens = uniqueFreshTokens.filter(token => {
+        const estimatedMarketCap = token.liquidityUSD * 2; // Simple estimation
+        return estimatedMarketCap >= minMarketCap;
+      });
+      
+      // Sortiere nach Volume (absteigend) 
+      filteredTokens.sort((a, b) => b.volumeUSD24h - a.volumeUSD24h);
+      
+      console.log(`✅ ${filteredTokens.length} frische Token gefunden (dedupliziert von ${allFreshTokens.length})`);
+      
+      // Debug: Zeige Top 5 frische Token mit Details
+      filteredTokens.slice(0, 5).forEach((token, i) => {
+        const ageHours = token.timestamp ? 
+          Math.round((Date.now() - new Date(token.timestamp).getTime()) / (1000 * 60 * 60)) : 
+          'unknown';
+        const estimatedMCap = token.liquidityUSD * 2;
+        
+        console.log(`${i + 1}. ${token.tokenSymbol}:`);
+        console.log(`   Address: ${token.tokenAddress.slice(0, 8)}...`);
+        console.log(`   Alter: ${ageHours}h`);
+        console.log(`   MCap: $${estimatedMCap.toLocaleString()}`);
+        console.log(`   Volume: $${token.volumeUSD24h.toLocaleString()}`);
+        console.log(`   Preis: $${token.priceUSD.toFixed(8)}`);
+      });
+
+      return filteredTokens;
+
+    } catch (error) {
+      console.error('❌ Fresh Token Suche fehlgeschlagen:', error);
+      throw new Error(`Fresh Token Suche fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+    }
+  }
+
+  /**
+   * DYNAMISCHE TOKEN-AUSWAHL für Backtesting
+   * Simuliert Token-Auswahl zu einem bestimmten Zeitpunkt in der Vergangenheit
+   */
+  async getTokensForBacktestDate(targetDate: Date, maxAgeHours: number = 24, minMarketCap: number = 50000): Promise<RaydiumTrade[]> {
+    try {
+      const dateString = targetDate.toISOString().split('T')[0];
+      console.log(`📅 Simuliere Token-Auswahl für ${dateString} (< ${maxAgeHours}h alt an diesem Tag)`);
+      
+      // Da DexScreener keine historischen Daten hat, simulieren wir basierend auf aktuellen Daten
+      // aber filtern nach einem künstlichen "Alter" relativ zum Backtest-Datum
+      const currentTokens = await this.getFreshRaydiumTokens(maxAgeHours * 7, minMarketCap); // Erweiterte Suche
+      
+      // Simuliere Token-Verfügbarkeit basierend auf Hash des Datums + Token-Adresse
+      const availableTokens = currentTokens.filter(token => {
+        // Deterministische "Verfügbarkeit" basierend auf Datum und Token
+        const hash = this.createSimpleHash(targetDate.getTime() + token.tokenAddress);
+        const availabilityThreshold = 0.3; // 30% der Token sind an einem gegebenen Tag "verfügbar"
+        return (hash % 100) / 100 < availabilityThreshold;
+      });
+      
+      // Weitere Filterung: Simuliere dass nur einige Token die Kriterien erfüllen
+      const qualifiedTokens = availableTokens.filter(token => {
+        const hash = this.createSimpleHash(targetDate.getTime() + token.tokenAddress + 'qualified');
+        const qualificationThreshold = 0.6; // 60% der verfügbaren Token erfüllen die Kriterien
+        return (hash % 100) / 100 < qualificationThreshold;
+      });
+      
+      // Mische die Token für Realismus
+      const shuffledTokens = this.shuffleArray([...qualifiedTokens], targetDate.getTime());
+      
+      console.log(`📊 ${shuffledTokens.length} Token simuliert für ${dateString}`);
+      
+      return shuffledTokens.slice(0, 20); // Max 20 Token pro Tag
+      
+    } catch (error) {
+      console.error(`❌ Backtest Token-Auswahl für ${targetDate.toISOString()} fehlgeschlagen:`, error);
+      return []; // Leere Liste bei Fehler
+    }
+  }
+
+  /**
+   * Hilfsfunktionen für deterministische Simulation
+   */
+  private createSimpleHash(input: string | number): number {
+    const str = input.toString();
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+  }
+
+  private shuffleArray<T>(array: T[], seed: number): T[] {
+    const shuffled = [...array];
+    let currentIndex = shuffled.length;
+    let randomIndex;
+
+    // Seeded random shuffle
+    const seededRandom = (seed: number) => {
+      const x = Math.sin(seed++) * 10000;
+      return x - Math.floor(x);
+    };
+
+    while (currentIndex !== 0) {
+      randomIndex = Math.floor(seededRandom(seed + currentIndex) * currentIndex);
+      currentIndex--;
+      [shuffled[currentIndex], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[currentIndex]];
+    }
+
+    return shuffled;
+  }
+
+  /**
    * Debug-Funktion für DexScreener API
    */
   async debugAPIConfig(): Promise<void> {

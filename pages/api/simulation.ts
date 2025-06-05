@@ -111,7 +111,8 @@ async function runDexScreenerSimulation(
 ): Promise<SimulationResult> {
   
   clearDebugLogs();
-  addDebugLog('🔍 Starting DexScreener-based simulation...');
+  addDebugLog('🔍 Starting FRESH Memecoin simulation...');
+  addDebugLog(`🎯 Bot: ${botType} | Target: ${tokenCount} frische Token`);
   
   try {
     const dexScreenerAPI = new BitqueryAPI();
@@ -123,21 +124,8 @@ async function runDexScreenerSimulation(
       throw new Error('DexScreener API connection failed');
     }
     
-    // Get current trading tokens
-    addDebugLog('📊 Fetching Raydium tokens...');
-    const raydiumTokens = await dexScreenerAPI.getEnhancedRaydiumTokens();
-    addDebugLog(`✅ Loaded ${raydiumTokens.length} tokens`);
-    
-    if (raydiumTokens.length === 0) {
-      throw new Error('No tokens available');
-    }
-    
-    // Select tokens for this bot type
-    const selectedTokens = selectTokensForBot(raydiumTokens, botType, tokenCount);
-    addDebugLog(`🎯 Selected ${selectedTokens.length} tokens for ${botType}`);
-    
-    // Run simulation
-    const simulation = await simulateTrading(selectedTokens, botType);
+    // Run dynamic 7-day backtest with fresh tokens each day
+    const simulation = await runDynamicBacktest(dexScreenerAPI, botType, tokenCount);
     
     return {
       botType,
@@ -149,14 +137,14 @@ async function runDexScreenerSimulation(
       tradeCount: simulation.totalTrades,
       successRate: simulation.successRate,
       dailyData: simulation.dailyData,
-      tokens: selectedTokens,
+      tokens: simulation.allTokensUsed,
       riskMetrics: {
         maxDrawdown: simulation.maxDrawdown,
         sharpeRatio: 1.2,
         winRate: simulation.successRate
       },
       debugLogs: [...debugLogs],
-      dataSource: 'dexscreener-api'
+      dataSource: 'dexscreener-fresh-tokens'
     };
     
   } catch (error) {
@@ -175,9 +163,134 @@ async function runDexScreenerSimulation(
       tokens: [],
       riskMetrics: { maxDrawdown: 0, sharpeRatio: 0, winRate: 0 },
       debugLogs: [...debugLogs],
-      dataSource: 'dexscreener-api'
+      dataSource: 'dexscreener-fresh-tokens'
     };
   }
+}
+
+async function runDynamicBacktest(
+  dexScreenerAPI: BitqueryAPI,
+  botType: string,
+  maxTokensPerDay: number
+) {
+  const startingCapital = 1000;
+  let currentCapital = startingCapital;
+  let totalTrades = 0;
+  let successfulTrades = 0;
+  let maxCapital = startingCapital;
+  
+  const dailyData: { date: string; value: number }[] = [];
+  const allTokensUsed: RaydiumTrade[] = [];
+  
+  // MEMECOIN TRADING PARAMETERS
+  const STOP_LOSS_PERCENT = 35; // 35% Stop Loss für Memecoins
+  const TAKE_PROFIT_PERCENT = 200; // 200% Take Profit für Memecoins
+  const POSITION_SIZE_PERCENT = 10; // 10% Position Size für high-risk Memecoins
+  
+  addDebugLog(`🎯 MEMECOIN BACKTEST START`);
+  addDebugLog(`Bot: ${botType} | Stop Loss: ${STOP_LOSS_PERCENT}% | Take Profit: ${TAKE_PROFIT_PERCENT}%`);
+  addDebugLog(`Position Size: ${POSITION_SIZE_PERCENT}% | Startkapital: $${startingCapital}`);
+  
+  // Simulate 7 days of trading with fresh tokens each day
+  for (let day = 0; day < 7; day++) {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() - (6 - day));
+    const dateString = targetDate.toISOString().split('T')[0];
+    
+    addDebugLog(`📅 Tag ${day + 1}: ${dateString}`);
+    
+    const dayStartCapital = currentCapital;
+    
+    try {
+      // Get fresh tokens available on this specific day
+      addDebugLog(`🔍 Suche frische Memecoins für ${dateString}...`);
+      const freshTokens = await dexScreenerAPI.getTokensForBacktestDate(
+        targetDate, 
+        24, // < 24h alt
+        50000 // > $50k Market Cap
+      );
+      
+      addDebugLog(`📊 ${freshTokens.length} frische Memecoins gefunden für ${dateString}`);
+      
+      if (freshTokens.length === 0) {
+        addDebugLog(`⚠️ Keine Memecoins für ${dateString} - überspringe Tag`);
+        dailyData.push({ date: dateString, value: currentCapital });
+        continue;
+      }
+      
+      // Select best tokens for this bot type
+      const selectedTokens = selectTokensForBot(freshTokens, botType, Math.min(maxTokensPerDay, 5));
+      addDebugLog(`🎯 ${selectedTokens.length} Memecoins ausgewählt für ${botType}`);
+      
+      // Add to all tokens used (for debugging)
+      allTokensUsed.push(...selectedTokens.slice(0, 3)); // Only add top 3 to avoid clutter
+      
+      // Debug: Show selected tokens
+      selectedTokens.slice(0, 3).forEach((token, i) => {
+        const estimatedMCap = token.liquidityUSD * 2;
+        addDebugLog(`   ${i + 1}. ${token.tokenSymbol}: MCap ~$${estimatedMCap.toLocaleString()}, Vol: $${token.volumeUSD24h.toLocaleString()}, Change: ${token.priceChange24h.toFixed(1)}%`);
+      });
+      
+      // Trade selected tokens with MEMECOIN LOGIC
+      for (const token of selectedTokens) {
+        if (currentCapital < 100) break; // Min trade size increased for memecoins
+        
+        const shouldTrade = getMemecoinTradeSignal(token, botType);
+        
+        if (shouldTrade) {
+          const tradeAmount = currentCapital * (POSITION_SIZE_PERCENT / 100); // 10% position size
+          totalTrades++;
+          
+          // MEMECOIN OUTCOME SIMULATION
+          const outcome = simulateMemecoinTrade(token, botType, STOP_LOSS_PERCENT, TAKE_PROFIT_PERCENT);
+          
+          if (outcome.result === 'PROFIT') {
+            const profit = tradeAmount * (outcome.percentage / 100);
+            currentCapital += profit;
+            successfulTrades++;
+            addDebugLog(`🚀 ${token.tokenSymbol}: +$${profit.toFixed(2)} (+${outcome.percentage.toFixed(1)}%) ${outcome.reason}`);
+          } else {
+            const loss = tradeAmount * (outcome.percentage / 100);
+            currentCapital -= loss;
+            addDebugLog(`💥 ${token.tokenSymbol}: -$${loss.toFixed(2)} (-${outcome.percentage.toFixed(1)}%) ${outcome.reason}`);
+          }
+          
+          maxCapital = Math.max(maxCapital, currentCapital);
+        }
+      }
+      
+    } catch (dayError) {
+      addDebugLog(`❌ Fehler an Tag ${day + 1}: ${dayError instanceof Error ? dayError.message : 'Unknown'}`);
+    }
+    
+    const dayProfit = currentCapital - dayStartCapital;
+    addDebugLog(`📊 Tag ${day + 1} Ende: $${currentCapital.toFixed(2)} (${dayProfit >= 0 ? '+' : ''}$${dayProfit.toFixed(2)})`);
+    
+    dailyData.push({ date: dateString, value: currentCapital });
+  }
+  
+  const totalProfit = currentCapital - startingCapital;
+  const profitPercentage = (totalProfit / startingCapital) * 100;
+  const successRate = totalTrades > 0 ? (successfulTrades / totalTrades) * 100 : 0;
+  const maxDrawdown = maxCapital > 0 ? ((maxCapital - currentCapital) / maxCapital) * 100 : 0;
+  
+  addDebugLog(`🎉 === MEMECOIN BACKTEST COMPLETE ===`);
+  addDebugLog(`Endkapital: $${currentCapital.toFixed(2)}`);
+  addDebugLog(`Gewinn: $${totalProfit.toFixed(2)} (${profitPercentage.toFixed(2)}%)`);
+  addDebugLog(`Trades: ${successfulTrades}/${totalTrades} (${successRate.toFixed(1)}% Win Rate)`);
+  addDebugLog(`Max Drawdown: ${maxDrawdown.toFixed(2)}%`);
+  addDebugLog(`Memecoins verwendet: ${allTokensUsed.length} verschiedene frische Token`);
+  
+  return {
+    totalTrades,
+    successfulTrades,
+    totalProfit,
+    profitPercentage,
+    successRate,
+    dailyData,
+    maxDrawdown,
+    allTokensUsed: removeDuplicateTokens(allTokensUsed)
+  };
 }
 
 function selectTokensForBot(tokens: RaydiumTrade[], botType: string, count: number): RaydiumTrade[] {
@@ -197,110 +310,134 @@ function selectTokensForBot(tokens: RaydiumTrade[], botType: string, count: numb
   return sorted.slice(0, count);
 }
 
-async function simulateTrading(tokens: RaydiumTrade[], botType: string) {
-  const startingCapital = 1000;
-  let currentCapital = startingCapital;
-  let totalTrades = 0;
-  let successfulTrades = 0;
-  let maxCapital = startingCapital;
-  
-  const dailyData: { date: string; value: number }[] = [];
-  
-  addDebugLog(`🎯 Simulating ${botType} with ${tokens.length} tokens`);
-  
-  // Simulate 7 days of trading
-  for (let day = 0; day < 7; day++) {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - day));
-    const dateString = date.toISOString().split('T')[0];
-    
-    const dayStartCapital = currentCapital;
-    
-    // Trade top tokens for this day
-    for (const token of tokens.slice(0, 5)) {
-      if (currentCapital < 50) break;
-      
-      const shouldTrade = getTradeSignal(token, botType);
-      
-      if (shouldTrade) {
-        const tradeAmount = Math.min(currentCapital * 0.15, 100); // 15% or max $100
-        totalTrades++;
-        
-        const successProbability = calculateSuccessProbability(token, botType);
-        const isSuccessful = Math.random() < successProbability;
-        
-        if (isSuccessful) {
-          const profit = tradeAmount * (0.03 + Math.random() * 0.12); // 3-15% profit
-          currentCapital += profit;
-          successfulTrades++;
-          addDebugLog(`✅ ${token.tokenSymbol}: +$${profit.toFixed(2)}`);
-        } else {
-          const loss = tradeAmount * (0.02 + Math.random() * 0.06); // 2-8% loss
-          currentCapital -= loss;
-          addDebugLog(`❌ ${token.tokenSymbol}: -$${loss.toFixed(2)}`);
-        }
-        
-        maxCapital = Math.max(maxCapital, currentCapital);
-      }
-    }
-    
-    const dayProfit = currentCapital - dayStartCapital;
-    addDebugLog(`📊 Day ${day + 1}: $${currentCapital.toFixed(2)} (${dayProfit >= 0 ? '+' : ''}$${dayProfit.toFixed(2)})`);
-    
-    dailyData.push({ date: dateString, value: currentCapital });
-  }
-  
-  const totalProfit = currentCapital - startingCapital;
-  const profitPercentage = (totalProfit / startingCapital) * 100;
-  const successRate = totalTrades > 0 ? (successfulTrades / totalTrades) * 100 : 0;
-  const maxDrawdown = ((maxCapital - currentCapital) / maxCapital) * 100;
-  
-  addDebugLog(`🎉 Final: $${currentCapital.toFixed(2)} | Profit: ${profitPercentage.toFixed(2)}% | Win Rate: ${successRate.toFixed(1)}%`);
-  
-  return {
-    totalTrades,
-    successfulTrades,
-    totalProfit,
-    profitPercentage,
-    successRate,
-    dailyData,
-    maxDrawdown
-  };
-}
-
-function getTradeSignal(token: RaydiumTrade, botType: string): boolean {
+function getMemecoinTradeSignal(token: RaydiumTrade, botType: string): boolean {
+  // MEMECOIN-SPEZIFISCHE TRADING-SIGNALE (viel aggressiver)
   switch (botType) {
     case 'volume-tracker':
-      return token.volumeUSD24h > 50000 && token.trades24h > 100;
+      // Suche nach Volume-Explosionen (typisch für Memecoin-Pumps)
+      return token.volumeUSD24h > 100000 && token.trades24h > 300;
     case 'trend-surfer':
-      return token.priceChange24h > 5 && token.volumeUSD24h > 20000;
+      // Suche nach starken Trends (Memecoins können 100%+ machen)
+      return token.priceChange24h > 20 && token.volumeUSD24h > 50000;
     case 'dip-hunter':
-      return token.priceChange24h < -5 && token.volumeUSD24h > 15000;
+      // Suche nach großen Dips mit hoher Liquidität (Bounce-Potential)
+      return token.priceChange24h < -20 && token.liquidityUSD > 100000 && token.volumeUSD24h > 30000;
     default:
-      return token.volumeUSD24h > 30000;
+      return token.volumeUSD24h > 75000;
   }
 }
 
-function calculateSuccessProbability(token: RaydiumTrade, botType: string): number {
-  let probability = 0.4; // Base 40%
+function simulateMemecoinTrade(
+  token: RaydiumTrade, 
+  botType: string, 
+  stopLossPercent: number, 
+  takeProfitPercent: number
+): { result: 'PROFIT' | 'LOSS', percentage: number, reason: string } {
   
-  // Volume bonus
-  if (token.volumeUSD24h > 100000) probability += 0.1;
-  if (token.liquidityUSD > 50000) probability += 0.1;
-  if (token.trades24h > 500) probability += 0.1;
+  // REALISTISCHE MEMECOIN-WAHRSCHEINLICHKEITEN
+  const basePumpChance = 0.25; // 25% Chance auf Pump
+  const baseDumpChance = 0.35; // 35% Chance auf Dump  
+  const sidewaysChance = 0.40; // 40% Chance auf Seitwärtsbewegung
   
-  // Bot-specific bonuses
+  // Adjust probabilities based on token metrics
+  let pumpChance = basePumpChance;
+  let dumpChance = baseDumpChance;
+  
+  // Volume-based adjustments
+  if (token.volumeUSD24h > 200000) pumpChance += 0.15; // High volume = pump potential
+  if (token.volumeUSD24h < 20000) dumpChance += 0.15; // Low volume = dump risk
+  
+  // Price action adjustments
+  if (token.priceChange24h > 50) pumpChance += 0.2; // Already pumping
+  if (token.priceChange24h < -30) {
+    pumpChance += 0.1; // Oversold bounce potential
+    dumpChance -= 0.1;
+  }
+  
+  // Market cap adjustments
+  const estimatedMCap = token.liquidityUSD * 2;
+  if (estimatedMCap < 100000) dumpChance += 0.1; // Very low cap = higher risk
+  if (estimatedMCap > 1000000) pumpChance += 0.1; // Established = lower dump risk
+  
+  // Bot-specific adjustments
   switch (botType) {
     case 'volume-tracker':
-      if (token.volumeUSD24h > 200000) probability += 0.15;
+      if (token.trades24h > 1000) pumpChance += 0.1;
       break;
     case 'trend-surfer':
-      if (token.priceChange24h > 10) probability += 0.15;
+      if (token.priceChange24h > 30) pumpChance += 0.15;
       break;
     case 'dip-hunter':
-      if (token.priceChange24h < -10 && token.priceChange24h > -30) probability += 0.15;
+      if (token.priceChange24h < -40) pumpChance += 0.2; // Deep dip = bounce potential
       break;
   }
   
-  return Math.min(0.75, Math.max(0.25, probability));
+  // Normalize probabilities
+  const total = pumpChance + dumpChance + sidewaysChance;
+  pumpChance = pumpChance / total;
+  dumpChance = dumpChance / total;
+  
+  const random = Math.random();
+  
+  if (random < pumpChance) {
+    // PUMP: 50% chance to hit take profit, 50% chance for partial gains
+    if (Math.random() < 0.5) {
+      return { 
+        result: 'PROFIT', 
+        percentage: takeProfitPercent, 
+        reason: `🚀 PUMP! +${takeProfitPercent}%` 
+      };
+    } else {
+      const partialGain = 30 + Math.random() * 120; // 30-150% gain
+      return { 
+        result: 'PROFIT', 
+        percentage: partialGain, 
+        reason: `📈 Teilgewinn +${partialGain.toFixed(0)}%` 
+      };
+    }
+  } else if (random < pumpChance + dumpChance) {
+    // DUMP: 70% chance to hit stop loss, 30% chance for partial loss
+    if (Math.random() < 0.7) {
+      return { 
+        result: 'LOSS', 
+        percentage: stopLossPercent, 
+        reason: `💥 DUMP! -${stopLossPercent}%` 
+      };
+    } else {
+      const partialLoss = 10 + Math.random() * 20; // 10-30% loss
+      return { 
+        result: 'LOSS', 
+        percentage: partialLoss, 
+        reason: `📉 Teilverlust -${partialLoss.toFixed(0)}%` 
+      };
+    }
+  } else {
+    // SIDEWAYS: Small random movement
+    if (Math.random() < 0.6) {
+      const smallGain = 2 + Math.random() * 15; // 2-17% gain
+      return { 
+        result: 'PROFIT', 
+        percentage: smallGain, 
+        reason: `➡️ Seitwärts +${smallGain.toFixed(0)}%` 
+      };
+    } else {
+      const smallLoss = 2 + Math.random() * 10; // 2-12% loss
+      return { 
+        result: 'LOSS', 
+        percentage: smallLoss, 
+        reason: `➡️ Seitwärts -${smallLoss.toFixed(0)}%` 
+      };
+    }
+  }
+}
+
+function removeDuplicateTokens(tokens: RaydiumTrade[]): RaydiumTrade[] {
+  const seen = new Set<string>();
+  return tokens.filter(token => {
+    if (seen.has(token.tokenAddress)) {
+      return false;
+    }
+    seen.add(token.tokenAddress);
+    return true;
+  });
 }
