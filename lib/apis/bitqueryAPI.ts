@@ -139,7 +139,7 @@ export class BitqueryAPI {
     // KORRIGIERTE QUERY basierend auf aktueller Bitquery V2 EAP API-Dokumentation
     const query = `
       query EnhancedRaydiumTokens {
-        Solana {
+        Solana(dataset: realtime) {
           DEXTradeByTokens(
             where: {
               Trade: {
@@ -527,7 +527,7 @@ export class BitqueryAPI {
 
     const query = `
       query Token5MinuteHistory {
-        Solana {
+        Solana(dataset: realtime) {
           DEXTrades(
             where: {
               Trade: {
@@ -642,7 +642,7 @@ export class BitqueryAPI {
   async checkPumpFunMigration(tokenAddress: string): Promise<BitqueryMigrationData | null> {
     const query = `
       query CheckMigration {
-        Solana {
+        Solana(dataset: realtime) {
           DEXTrades(
             where: {
               Trade: { Currency: { MintAddress: { is: "${tokenAddress}" } } }
@@ -810,7 +810,7 @@ export class BitqueryAPI {
     
     const simpleQuery = `
       query DebugRaydium {
-        Solana {
+        Solana(dataset: realtime) {
           DEXTradeByTokens(
             where: {
               Trade: {
@@ -882,7 +882,7 @@ export class BitqueryAPI {
     
     const fallbackQuery = `
       query FallbackRaydiumTokens {
-        Solana {
+        Solana(dataset: realtime) {
           DEXTradeByTokens(
             where: {
               Trade: {
@@ -1049,7 +1049,7 @@ export class BitqueryAPI {
     
     const query = `
       query TokensCreatedBeforeDate {
-        Solana {
+        Solana(dataset: combined) {
           DEXTradeByTokens(
             where: {
               Block: { 
@@ -1220,7 +1220,7 @@ export class BitqueryAPI {
     
     const query = `
       query TokenDayHistory {
-        Solana {
+        Solana(dataset: realtime) {
           DEXTrades(
             where: {
               Block: { 
