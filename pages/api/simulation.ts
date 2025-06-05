@@ -93,6 +93,10 @@ async function simulateWithBitqueryData(
     addDebugLog('🔧 === COMPREHENSIVE BITQUERY API DEBUG ===');
     await bitqueryAPI.debugAPIConfig();
     
+    // Test verschiedene Blockchain-APIs
+    addDebugLog('🔍 === TESTING VARIOUS BLOCKCHAIN APIS ===');
+    await bitqueryAPI.testBlockchainAPIs();
+    
     // Test API Connection
     addDebugLog('🧪 Testing Bitquery API connection...');
     const schemaWorking = await bitqueryAPI.testConnection();

@@ -755,43 +755,88 @@ export class BitqueryAPI {
    * Test-Funktion für API-Verbindung
    */
   async testConnection(): Promise<boolean> {
-    // TESTE EINFACHSTE MÖGLICHE QUERY
-    const simpleTestQuery = `
-      query SimpleTest {
+    // TESTE GRUNDLEGENDE INTROSPECTION
+    const introspectionQuery = `
+      query IntrospectionQuery {
         __schema {
           queryType {
-            name
+            fields {
+              name
+              type {
+                name
+              }
+            }
           }
         }
       }
     `;
 
     try {
-      console.log('🧪 Teste Bitquery API mit einfachster Schema-Query...');
+      console.log('🧪 Teste Bitquery API mit Introspection Query...');
       await this.handleRateLimit();
-      const response = await this.executeQuery(simpleTestQuery);
+      const response = await this.executeQuery(introspectionQuery);
       
-      if (response?.data?.__schema) {
+      if (response?.data?.__schema?.queryType?.fields) {
         console.log('✅ Bitquery API Schema erreichbar');
-        console.log('📋 Query Type:', response.data.__schema.queryType?.name);
+        const fields = response.data.__schema.queryType.fields;
+        console.log(`📋 Verfügbare Root Query Fields (${fields.length} total):`);
         
-        // TESTE SOLANA-VERFÜGBARKEIT
-        const solanaTestQuery = `
-          query TestSolana {
-            __type(name: "RootQuery") {
-              fields {
-                name
-                type {
-                  name
-                }
+        // Zeige alle verfügbaren Root-Fields
+        fields.forEach((field: any, index: number) => {
+          if (index < 20) { // Zeige nur erste 20
+            console.log(`   ${index + 1}. ${field.name} (Type: ${field.type?.name || 'Complex'})`);
+          }
+        });
+        
+        // Suche explizit nach Solana-Fields
+        const solanaFields = fields.filter((field: any) => 
+          field.name.toLowerCase().includes('solana') || 
+          field.name.toLowerCase().includes('sol')
+        );
+        
+        console.log(`🔍 Solana-related fields found (${solanaFields.length}):`);
+        solanaFields.forEach((field: any) => {
+          console.log(`   ✅ ${field.name} (Type: ${field.type?.name || 'Complex'})`);
+        });
+        
+        if (solanaFields.length === 0) {
+          console.error('❌ KEINE SOLANA-FELDER GEFUNDEN! Das ist das Problem.');
+          console.log('🔄 Teste alternative API-Endpunkte...');
+          
+          // Teste V1 API
+          const originalUrl = this.baseUrl;
+          this.baseUrl = 'https://graphql.bitquery.io';
+          
+          try {
+            console.log('🔄 Teste V1 API Endpunkt...');
+            const v1Response = await this.executeQuery(introspectionQuery);
+            
+            if (v1Response?.data?.__schema?.queryType?.fields) {
+              const v1Fields = v1Response.data.__schema.queryType.fields;
+              const v1SolanaFields = v1Fields.filter((field: any) => 
+                field.name.toLowerCase().includes('solana') || 
+                field.name.toLowerCase().includes('sol')
+              );
+              
+              console.log(`📊 V1 API Solana fields found (${v1SolanaFields.length}):`);
+              v1SolanaFields.forEach((field: any) => {
+                console.log(`   ✅ ${field.name} (Type: ${field.type?.name || 'Complex'})`);
+              });
+              
+              if (v1SolanaFields.length > 0) {
+                console.log('✅ V1 API hat Solana-Support! Wechsle zu V1.');
+                // Behalte V1 URL
+                return true;
               }
             }
+          } catch (v1Error) {
+            console.error('❌ V1 API auch fehlgeschlagen:', v1Error);
           }
-        `;
-        
-        console.log('🔍 Teste Solana-Verfügbarkeit...');
-        const solanaResponse = await this.executeQuery(solanaTestQuery);
-        console.log('📊 RootQuery fields:', JSON.stringify(solanaResponse?.data?.__type?.fields?.slice(0, 10), null, 2));
+          
+          // Stelle ursprüngliche URL wieder her
+          this.baseUrl = originalUrl;
+          return false;
+        }
         
         return true;
       } else {
@@ -800,40 +845,23 @@ export class BitqueryAPI {
         return false;
       }
     } catch (error) {
-      console.error('❌ Bitquery API Test fehlgeschlagen:', error);
+      console.error('❌ Bitquery API Introspection fehlgeschlagen:', error);
       
       // TESTE ALTERNATIVE API-STRUKTUR
-      const alternativeQuery = `
+      const simpleQuery = `
         {
           __typename
         }
       `;
       
       try {
-        console.log('🔄 Versuche alternative Basis-Query...');
-        const alternativeResponse = await this.executeQuery(alternativeQuery);
-        console.log('📝 Alternative Query Response:', JSON.stringify(alternativeResponse, null, 2));
-        return alternativeResponse !== null;
-      } catch (altError) {
-        console.error('❌ Auch alternative Query fehlgeschlagen:', altError);
-        
-        // TESTE MIT VERSCHIEDENEN ENDPUNKTEN
-        console.log('🔄 Teste mit verschiedenen API-Endpunkten...');
-        
-        // Teste V1 API
-        const originalUrl = this.baseUrl;
-        this.baseUrl = 'https://graphql.bitquery.io';
-        
-        try {
-          console.log('🔄 Teste V1 API Endpunkt...');
-          const v1Response = await this.executeQuery(alternativeQuery);
-          console.log('📝 V1 API Response:', JSON.stringify(v1Response, null, 2));
-          return v1Response !== null;
-        } catch (v1Error) {
-          console.error('❌ V1 API auch fehlgeschlagen:', v1Error);
-          this.baseUrl = originalUrl; // Stelle ursprüngliche URL wieder her
-          return false;
-        }
+        console.log('🔄 Versuche einfache Basis-Query...');
+        const simpleResponse = await this.executeQuery(simpleQuery);
+        console.log('📝 Einfache Query Response:', JSON.stringify(simpleResponse, null, 2));
+        return simpleResponse !== null;
+      } catch (simpleError) {
+        console.error('❌ Auch einfache Query fehlgeschlagen:', simpleError);
+        return false;
       }
     }
   }
@@ -1436,6 +1464,82 @@ export class BitqueryAPI {
         }
       } catch (error) {
         console.log(`❌ Fetch Error:`, error);
+      }
+    }
+  }
+
+  /**
+   * DEBUG: Teste verschiedene Blockchain-APIs
+   */
+  async testBlockchainAPIs(): Promise<void> {
+    console.log('🔍 === TESTING VARIOUS BLOCKCHAIN APIS ===');
+    
+    const testQueries = [
+      {
+        name: 'Ethereum Test',
+        query: `
+          query EthereumTest {
+            ethereum {
+              blocks(limit: {count: 1}) {
+                height
+              }
+            }
+          }
+        `
+      },
+      {
+        name: 'Bitcoin Test',
+        query: `
+          query BitcoinTest {
+            bitcoin {
+              blocks(limit: {count: 1}) {
+                height
+              }
+            }
+          }
+        `
+      },
+      {
+        name: 'BSC Test',
+        query: `
+          query BSCTest {
+            bsc: ethereum(network: bsc) {
+              blocks(limit: {count: 1}) {
+                height
+              }
+            }
+          }
+        `
+      },
+      {
+        name: 'Solana Test',
+        query: `
+          query SolanaTest {
+            solana {
+              blocks(limit: {count: 1}) {
+                height
+              }
+            }
+          }
+        `
+      }
+    ];
+    
+    for (const test of testQueries) {
+      console.log(`\n🧪 Testing ${test.name}...`);
+      try {
+        await this.handleRateLimit();
+        const response = await this.executeQuery(test.query);
+        
+        if (response?.data) {
+          console.log(`✅ ${test.name} SUCCESSFUL`);
+          console.log(`   Response:`, JSON.stringify(response.data, null, 2));
+        } else {
+          console.log(`❌ ${test.name} FAILED - No data`);
+          console.log(`   Full response:`, JSON.stringify(response, null, 2));
+        }
+      } catch (error) {
+        console.log(`❌ ${test.name} FAILED - Error:`, error instanceof Error ? error.message : 'Unknown error');
       }
     }
   }
