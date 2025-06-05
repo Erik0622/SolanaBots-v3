@@ -1,14 +1,45 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { RealTokenSimulator } from '../../lib/simulation/realTokenSimulator';
-import { BitqueryAPI, BitqueryToken } from '../../lib/apis/bitqueryAPI';
+import { NextApiRequest, NextApiResponse } from 'next';
+import { bitqueryAPI } from '../../lib/apis/bitqueryAPI';
+
+// TEMPORÄRE API-KEY KONFIGURATION bis .env funktioniert
+if (!process.env.BITQUERY_API_KEY) {
+  process.env.BITQUERY_API_KEY = 'ory_at_4t1KnHlwObAx_MVV5xuXlHRa86VmpiA7KhJjNLyC9MQ.-3tIZhQyT8xbIf5EQnt2e8GLnux0pFAwyl1uCVzZQZg';
+}
+
+interface RaydiumTrade {
+  tokenAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
+  priceUSD: number;
+  volumeUSD24h: number;
+  priceChange24h: number;
+  liquidityUSD: number;
+  trades24h: number;
+  timestamp: string;
+}
 
 interface BitquerySimulationResult {
+  botType: string;
+  status: 'success' | 'failed';
+  totalTrades: number;
+  successfulTrades: number;
+  totalProfit: number;
   profitPercentage: number;
-  tradeCount: number;
-  successRate: number;
-  dailyData: { date: string; value: number }[];
-  tokens: BitqueryToken[];
-  dataSource: 'bitquery-api';
+  bestTrade?: {
+    token: string;
+    profit: number;
+    profitPercentage: number;
+  };
+  worstTrade?: {
+    token: string;
+    profit: number;
+    profitPercentage: number;
+  };
+  riskMetrics: {
+    maxDrawdown: number;
+    sharpeRatio: number;
+    winRate: number;
+  };
   debugLogs: string[];
 }
 
