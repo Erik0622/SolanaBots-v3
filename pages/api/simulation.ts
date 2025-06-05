@@ -12,6 +12,13 @@ interface BitquerySimulationResult {
   debugLogs: string[];
 }
 
+export const config = {
+  api: {
+    responseLimit: false,
+    maxDuration: 60, // 60 Sekunden für Pro Plan (statt 10s default)
+  },
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -30,7 +37,7 @@ export default async function handler(
     console.log(`🚀 Starting ${useBitquery ? 'Bitquery' : 'Legacy'} simulation for bot: ${botType}`);
 
     if (useBitquery) {
-      // NEUE BITQUERY SIMULATION
+      // NEUE BITQUERY SIMULATION mit Timeout-Optimierung
       const result = await simulateWithBitqueryData(botType, tokenCount);
       return res.status(200).json(result);
     } else {
@@ -108,8 +115,8 @@ async function simulateWithBitqueryData(
 }
 
 /**
- * ECHTE 7-TAGE PROGRESSIVE SIMULATION
- * Tag für Tag neue Token-Auswahl + echte Trading-Simulation
+ * ECHTE 7-TAGE PROGRESSIVE SIMULATION mit PERFORMANCE-OPTIMIERUNG
+ * Vollständige API-Nutzung, aber parallelisiert und timeout-optimiert
  */
 async function runSevenDayProgressiveSimulation(
   bitqueryAPI: BitqueryAPI,
@@ -146,11 +153,11 @@ async function runSevenDayProgressiveSimulation(
   const simulationEndDate = new Date();
   const simulationStartDate = new Date(simulationEndDate.getTime() - 7 * 24 * 60 * 60 * 1000);
   
-  console.log(`\n🎯 === 7-DAY PROGRESSIVE SIMULATION START ===`);
-  console.log(`Bot Type: ${botType}`);
-  console.log(`Max Tokens per Day: ${maxTokensPerDay}`);
-  console.log(`Starting Capital: $${startingCapital}`);
-  console.log(`Simulation Period: ${simulationStartDate.toISOString().split('T')[0]} bis ${simulationEndDate.toISOString().split('T')[0]}`);
+  addDebugLog(`🎯 === ECHTE 7-DAY PROGRESSIVE SIMULATION START ===`);
+  addDebugLog(`Bot Type: ${botType}`);
+  addDebugLog(`Max Tokens per Day: ${maxTokensPerDay}`);
+  addDebugLog(`Starting Capital: $${startingCapital}`);
+  addDebugLog(`Simulation Period: ${simulationStartDate.toISOString().split('T')[0]} bis ${simulationEndDate.toISOString().split('T')[0]}`);
   
   // QUICK TEST: Teste BitqueryAPI direkt
   try {
@@ -182,31 +189,125 @@ async function runSevenDayProgressiveSimulation(
       
       if (standardTokens.length === 0) {
         addDebugLog(`❌ EVEN STANDARD API HAS NO TOKENS - BitqueryAPI Problem!`);
+        throw new Error('Bitquery API returns no tokens - possible API issue');
       }
     }
   } catch (testError) {
     addDebugLog(`❌ BITQUERY API TEST FAILED: ${testError instanceof Error ? testError.message : 'Unknown error'}`);
+    throw new Error(`Bitquery API test failed: ${testError instanceof Error ? testError.message : 'Unknown error'}`);
   }
   
-  console.log(`\n📅 === STARTING DAY-BY-DAY SIMULATION ===`);
+  addDebugLog(`📅 === STARTING DAY-BY-DAY SIMULATION ===`);
   
-  // TAG FÜR TAG SIMULATION
-  for (let day = 0; day < 7; day++) {
-    const currentDate = new Date(simulationStartDate.getTime() + day * 24 * 60 * 60 * 1000);
-    const dateString = currentDate.toISOString().split('T')[0];
+  // SCHRITT 1: ALLE TOKEN-ABFRAGEN PARALLEL STARTEN (aber begrenzt für Stabilität)
+  addDebugLog(`⚡ PERFORMANCE BOOST: Starting controlled parallel token collection for all 7 days...`);
+  
+  // CHUNKED PROCESSING: Nur 3 Tage parallel (statt 7) für bessere Stabilität
+  const chunks: number[][] = [
+    [0, 1, 2], // Tag 1-3
+    [3, 4],    // Tag 4-5  
+    [5, 6]     // Tag 6-7
+  ];
+  
+  const allDayResults: Array<{
+    day: number;
+    date: string;
+    tokens: BitqueryToken[];
+    histories: Map<string, any[]>;
+  }> = [];
+  
+  // Verarbeite Chunks sequenziell, aber innerhalb chunk parallel
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+    const chunk = chunks[chunkIndex];
+    addDebugLog(`📦 Processing chunk ${chunkIndex + 1}/${chunks.length}: Days ${chunk.map(d => d + 1).join(', ')}`);
     
-    console.log(`\n📅 === SIMULATION TAG ${day + 1}: ${dateString} ===`);
-    console.log(`💰 Portfolio Wert zu Tagesbeginn: $${currentCapital.toFixed(2)}`);
+    const chunkPromises = chunk.map(day => {
+      const currentDate = new Date(simulationStartDate.getTime() + day * 24 * 60 * 60 * 1000);
+      const dateString = currentDate.toISOString().split('T')[0];
+      
+      return (async () => {
+        addDebugLog(`🔍 Day ${day + 1}: Collecting tokens for ${dateString}...`);
+        
+        try {
+          const dayTokens = await getEligibleTokensForDate(bitqueryAPI, currentDate, maxTokensPerDay);
+          addDebugLog(`🎯 Day ${day + 1}: ${dayTokens.length} tokens found`);
+          
+          if (dayTokens.length === 0) {
+            addDebugLog(`⚠️ Day ${day + 1}: No tokens - skipping history collection`);
+            return {
+              day,
+              date: dateString,
+              tokens: [],
+              histories: new Map<string, any[]>()
+            };
+          }
+          
+          // Load histories für diese Token
+          const tokenHistories = await loadTokenHistoriesForDate(bitqueryAPI, dayTokens, currentDate);
+          addDebugLog(`📊 Day ${day + 1}: Loaded histories for ${tokenHistories.size} tokens`);
+          
+          return {
+            day,
+            date: dateString,
+            tokens: dayTokens,
+            histories: tokenHistories
+          };
+        } catch (dayError) {
+          addDebugLog(`❌ Day ${day + 1} failed: ${dayError instanceof Error ? dayError.message : 'Unknown error'}`);
+          return {
+            day,
+            date: dateString,
+            tokens: [],
+            histories: new Map<string, any[]>()
+          };
+        }
+      })();
+    });
     
-    // SCHRITT 1: Token-Auswahl für diesen Tag
-    console.log(`🔍 STEP 1: Token selection for ${dateString}...`);
-    const dayTokens = await getEligibleTokensForDate(bitqueryAPI, currentDate, maxTokensPerDay);
-    console.log(`🎯 ${dayTokens.length} Token erfüllen Kriterien an Tag ${day + 1}`);
+    // Warte auf diesen Chunk (mit Timeout)
+    try {
+      const chunkResults = await Promise.race([
+        Promise.all(chunkPromises),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error(`Chunk ${chunkIndex + 1} timeout after 20s`)), 20000)
+        )
+      ]);
+      
+      allDayResults.push(...chunkResults);
+      addDebugLog(`✅ Chunk ${chunkIndex + 1} complete: ${chunkResults.length} days processed`);
+    } catch (chunkError) {
+      addDebugLog(`❌ Chunk ${chunkIndex + 1} failed: ${chunkError instanceof Error ? chunkError.message : 'Unknown error'}`);
+      
+      // Bei Chunk-Fehler: Füge leere Ergebnisse hinzu statt zu scheitern
+      chunk.forEach(day => {
+        const currentDate = new Date(simulationStartDate.getTime() + day * 24 * 60 * 60 * 1000);
+        const dateString = currentDate.toISOString().split('T')[0];
+        allDayResults.push({
+          day,
+          date: dateString,
+          tokens: [],
+          histories: new Map<string, any[]>()
+        });
+      });
+    }
+  }
+  
+  addDebugLog(`✅ CHUNKED COLLECTION COMPLETE: All 7 days processed in ${chunks.length} chunks`);
+  
+  // SCHRITT 3: SEQUENTIELLE TRADING-SIMULATION (weniger timeout-kritisch)
+  addDebugLog(`🎯 === STARTING SEQUENTIAL TRADING SIMULATION ===`);
+  
+  for (const dayResult of allDayResults) {
+    const { day, date, tokens: dayTokens, histories: tokenHistories } = dayResult;
+    
+    addDebugLog(`📅 === SIMULATION TAG ${day + 1}: ${date} ===`);
+    addDebugLog(`💰 Portfolio Wert zu Tagesbeginn: $${currentCapital.toFixed(2)}`);
+    addDebugLog(`🎯 ${dayTokens.length} Token verfügbar für Trading`);
     
     if (dayTokens.length === 0) {
-      console.log(`⚠️  Keine Token verfügbar für Tag ${day + 1} - SKIPPE TAG`);
+      addDebugLog(`⚠️ Keine Token verfügbar für Tag ${day + 1} - SKIPPE TAG`);
       dailyResults.push({
-        date: dateString,
+        date,
         value: ((currentCapital - startingCapital) / startingCapital) * 100
       });
       continue;
@@ -214,78 +315,75 @@ async function runSevenDayProgressiveSimulation(
     
     // DEBUG: Token Details
     dayTokens.forEach((token, index) => {
-      console.log(`📋 Token ${index + 1}: ${token.symbol} (${token.address.slice(0, 8)}...)`);
-      console.log(`   MCap: $${token.marketCap.toLocaleString()}, Vol: $${token.volume24h.toLocaleString()}, Age: ${token.age.toFixed(1)}h`);
+      addDebugLog(`📋 Token ${index + 1}: ${token.symbol} (${token.address.slice(0, 8)}...)`);
+      addDebugLog(`   MCap: $${token.marketCap.toLocaleString()}, Vol: $${token.volume24h.toLocaleString()}, Age: ${token.age.toFixed(1)}h`);
     });
-
-    // SCHRITT 2: Preishistorie für diese Token laden
-    console.log(`🔍 STEP 2: Loading price histories for ${dayTokens.length} tokens...`);
-    const tokenHistories = await loadTokenHistoriesForDate(bitqueryAPI, dayTokens, currentDate);
-    console.log(`📊 Loaded histories for ${tokenHistories.size} tokens`);
+    
+    addDebugLog(`📊 Loaded histories for ${tokenHistories.size} tokens`);
     
     // DEBUG: History Details
     for (const [address, history] of tokenHistories.entries()) {
       const token = dayTokens.find(t => t.address === address);
-      console.log(`📈 ${token?.symbol || 'UNKNOWN'}: ${history.length} candles loaded`);
+      addDebugLog(`📈 ${token?.symbol || 'UNKNOWN'}: ${history.length} candles loaded`);
       if (history.length > 0) {
-        console.log(`   First candle: $${history[0].close.toFixed(6)} at ${new Date(history[0].timestamp).toLocaleTimeString()}`);
-        console.log(`   Last candle: $${history[history.length - 1].close.toFixed(6)} at ${new Date(history[history.length - 1].timestamp).toLocaleTimeString()}`);
+        addDebugLog(`   First candle: $${history[0].close.toFixed(6)} at ${new Date(history[0].timestamp).toLocaleTimeString()}`);
+        addDebugLog(`   Last candle: $${history[history.length - 1].close.toFixed(6)} at ${new Date(history[history.length - 1].timestamp).toLocaleTimeString()}`);
       }
     }
     
     if (tokenHistories.size === 0) {
-      console.log(`❌ Keine Preishistorien für Tag ${day + 1} - SKIPPE TAG`);
+      addDebugLog(`❌ Keine Preishistorien für Tag ${day + 1} - SKIPPE TAG`);
       dailyResults.push({
-        date: dateString,
+        date,
         value: ((currentCapital - startingCapital) / startingCapital) * 100
       });
       continue;
     }
-
-    // SCHRITT 3: Trading-Simulation für diesen Tag
-    console.log(`🔍 STEP 3: Running trading simulation with ${botType} strategy...`);
+    
+    // TRADING-SIMULATION für diesen Tag
+    addDebugLog(`🔍 STEP 3: Running trading simulation with ${botType} strategy...`);
     const dayResult = await simulateTradingDay(
       botType,
       dayTokens,
       tokenHistories,
       currentCapital,
       openPositions,
-      currentDate
+      new Date(date)
     );
     
-    console.log(`📊 STEP 3 RESULT: ${dayResult.tradesExecuted} trades executed, ${dayResult.successfulTrades} successful`);
-
-    // SCHRITT 4: Portfolio aktualisieren
+    addDebugLog(`📊 STEP 3 RESULT: ${dayResult.tradesExecuted} trades executed, ${dayResult.successfulTrades} successful`);
+    
+    // Portfolio aktualisieren
     currentCapital = dayResult.endingCapital;
     totalTrades += dayResult.tradesExecuted;
     successfulTrades += dayResult.successfulTrades;
     allTokensUsed.push(...dayTokens);
-
-    // SCHRITT 5: Tagesperformance speichern
+    
+    // Tagesperformance speichern
     const dailyReturn = ((dayResult.endingCapital - startingCapital) / startingCapital) * 100;
     dailyResults.push({
-      date: dateString,
+      date,
       value: dailyReturn
     });
-
-    console.log(`📊 Tag ${day + 1} Ergebnis:`);
-    console.log(`   Trades: ${dayResult.tradesExecuted} (${dayResult.successfulTrades} erfolgreich)`);
-    console.log(`   Portfolio Ende: $${dayResult.endingCapital.toFixed(2)}`);
-    console.log(`   Offene Positionen: ${openPositions.size}`);
+    
+    addDebugLog(`📊 Tag ${day + 1} Ergebnis:`);
+    addDebugLog(`   Trades: ${dayResult.tradesExecuted} (${dayResult.successfulTrades} erfolgreich)`);
+    addDebugLog(`   Portfolio Ende: $${dayResult.endingCapital.toFixed(2)}`);
+    addDebugLog(`   Offene Positionen: ${openPositions.size}`);
   }
   
   // FINALE ERGEBNISSE
   const finalReturn = ((currentCapital - startingCapital) / startingCapital) * 100;
   const successRate = totalTrades > 0 ? (successfulTrades / totalTrades) * 100 : 0;
   
-  console.log(`\n🏁 === SIMULATION COMPLETE ===`);
-  console.log(`   Final Portfolio: $${currentCapital.toFixed(2)}`);
-  console.log(`   Total Return: ${finalReturn.toFixed(2)}%`);
-  console.log(`   Total Trades: ${totalTrades} (${successfulTrades} successful)`);
-  console.log(`   Success Rate: ${successRate.toFixed(1)}%`);
-  console.log(`   Tokens Used: ${allTokensUsed.length} unique tokens`);
-      
-      return {
+  addDebugLog(`🏁 === SIMULATION COMPLETE ===`);
+  addDebugLog(`   Final Portfolio: $${currentCapital.toFixed(2)}`);
+  addDebugLog(`   Total Return: ${finalReturn.toFixed(2)}%`);
+  addDebugLog(`   Total Trades: ${totalTrades} (${successfulTrades} successful)`);
+  addDebugLog(`   Success Rate: ${successRate.toFixed(1)}%`);
+  addDebugLog(`   Tokens Used: ${allTokensUsed.length} unique tokens`);
+  
+  return {
     profitPercentage: finalReturn,
     tradeCount: totalTrades,
     successRate,

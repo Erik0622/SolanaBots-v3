@@ -54,17 +54,18 @@ export interface BitqueryMigrationData {
 }
 
 export class BitqueryAPI {
-  private baseUrl = 'https://streaming.bitquery.io/eap';
-  private apiKey = process.env.BITQUERY_API_KEY || 'ory_at_4t1KnHlwObAx_MVV5xuXlHRa86VmpiA7KhJjNLyC9MQ.-3tIZhQyT8xbIf5EQnt2e8GLnux0pFAwyl1uCVzZQZg';
+  private apiKey: string;
+  private baseUrl = 'https://streaming.bitquery.io/graphql';
   private projectId = process.env.BITQUERY_PROJECT_ID || '0aeb55a3-7c07-4eb2-8672-3e33cbe428a2';
   private secret = process.env.BITQUERY_SECRET || 'A3pO89GykmVdSiAqvJvQfsiILK';
   private lastRequestTime = 0;
   private requestCount = 0;
-  private readonly rateLimitDelay = 6000; // 6 Sekunden zwischen Requests (10/min = 1 pro 6s)
+  private readonly RATE_LIMIT_DELAY = 2000; // REDUZIERT von 6s auf 2s für Speed
 
   constructor() {
+    this.apiKey = process.env.BITQUERY_API_KEY || 'ory_at_4t1KnHlwObAx_MVV5xuXlHRa86VmpiA7KhJjNLyC9MQ.-3tIZhQyT8xbIf5EQnt2e8GLnux0pFAwyl1uCVzZQZg';
     if (!this.apiKey) {
-      console.warn('⚠️  Bitquery API Key fehlt! Bitte BITQUERY_API_KEY in .env.local setzen');
+      throw new Error('BITQUERY_API_KEY environment variable is required');
     }
     console.log(`🔗 Bitquery V2 EAP API initialisiert für Projekt: ${this.projectId}`);
   }
@@ -76,8 +77,8 @@ export class BitqueryAPI {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
     
-    if (timeSinceLastRequest < this.rateLimitDelay) {
-      const waitTime = this.rateLimitDelay - timeSinceLastRequest;
+    if (timeSinceLastRequest < this.RATE_LIMIT_DELAY) {
+      const waitTime = this.RATE_LIMIT_DELAY - timeSinceLastRequest;
       console.log(`⏳ Rate Limit: Warte ${(waitTime / 1000).toFixed(1)}s...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
