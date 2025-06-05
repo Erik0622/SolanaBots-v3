@@ -297,8 +297,8 @@ async function runSevenDayProgressiveSimulation(
   // SCHRITT 3: SEQUENTIELLE TRADING-SIMULATION (weniger timeout-kritisch)
   addDebugLog(`🎯 === STARTING SEQUENTIAL TRADING SIMULATION ===`);
   
-  for (const dayResult of allDayResults) {
-    const { day, date, tokens: dayTokens, histories: tokenHistories } = dayResult;
+  for (const dayData of allDayResults) {
+    const { day, date, tokens: dayTokens, histories: tokenHistories } = dayData;
     
     addDebugLog(`📅 === SIMULATION TAG ${day + 1}: ${date} ===`);
     addDebugLog(`💰 Portfolio Wert zu Tagesbeginn: $${currentCapital.toFixed(2)}`);
@@ -342,7 +342,7 @@ async function runSevenDayProgressiveSimulation(
     
     // TRADING-SIMULATION für diesen Tag
     addDebugLog(`🔍 STEP 3: Running trading simulation with ${botType} strategy...`);
-    const dayResult = await simulateTradingDay(
+    const tradingResult = await simulateTradingDay(
       botType,
       dayTokens,
       tokenHistories,
@@ -351,24 +351,24 @@ async function runSevenDayProgressiveSimulation(
       new Date(date)
     );
     
-    addDebugLog(`📊 STEP 3 RESULT: ${dayResult.tradesExecuted} trades executed, ${dayResult.successfulTrades} successful`);
+    addDebugLog(`📊 STEP 3 RESULT: ${tradingResult.tradesExecuted} trades executed, ${tradingResult.successfulTrades} successful`);
     
     // Portfolio aktualisieren
-    currentCapital = dayResult.endingCapital;
-    totalTrades += dayResult.tradesExecuted;
-    successfulTrades += dayResult.successfulTrades;
+    currentCapital = tradingResult.endingCapital;
+    totalTrades += tradingResult.tradesExecuted;
+    successfulTrades += tradingResult.successfulTrades;
     allTokensUsed.push(...dayTokens);
     
     // Tagesperformance speichern
-    const dailyReturn = ((dayResult.endingCapital - startingCapital) / startingCapital) * 100;
+    const dailyReturn = ((tradingResult.endingCapital - startingCapital) / startingCapital) * 100;
     dailyResults.push({
       date,
       value: dailyReturn
     });
     
     addDebugLog(`📊 Tag ${day + 1} Ergebnis:`);
-    addDebugLog(`   Trades: ${dayResult.tradesExecuted} (${dayResult.successfulTrades} erfolgreich)`);
-    addDebugLog(`   Portfolio Ende: $${dayResult.endingCapital.toFixed(2)}`);
+    addDebugLog(`   Trades: ${tradingResult.tradesExecuted} (${tradingResult.successfulTrades} erfolgreich)`);
+    addDebugLog(`   Portfolio Ende: $${tradingResult.endingCapital.toFixed(2)}`);
     addDebugLog(`   Offene Positionen: ${openPositions.size}`);
   }
   
