@@ -89,6 +89,10 @@ async function simulateWithBitqueryData(
   try {
     const bitqueryAPI = new BitqueryAPI();
     
+    // COMPREHENSIVE API DEBUG TEST
+    addDebugLog('🔧 === COMPREHENSIVE BITQUERY API DEBUG ===');
+    await bitqueryAPI.debugAPIConfig();
+    
     // Test API Connection
     addDebugLog('🧪 Testing Bitquery API connection...');
     const schemaWorking = await bitqueryAPI.testConnection();

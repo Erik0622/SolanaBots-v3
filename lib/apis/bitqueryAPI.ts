@@ -755,11 +755,11 @@ export class BitqueryAPI {
    * Test-Funktion für API-Verbindung
    */
   async testConnection(): Promise<boolean> {
-    // EINFACHE INTROSPECTION QUERY
-    const introspectionQuery = `
-      query IntrospectionQuery {
+    // TESTE EINFACHSTE MÖGLICHE QUERY
+    const simpleTestQuery = `
+      query SimpleTest {
         __schema {
-          types {
+          queryType {
             name
           }
         }
@@ -767,36 +767,73 @@ export class BitqueryAPI {
     `;
 
     try {
-      console.log('🧪 Teste Bitquery API Schema...');
+      console.log('🧪 Teste Bitquery API mit einfachster Schema-Query...');
       await this.handleRateLimit();
-      const response = await this.executeQuery(introspectionQuery);
+      const response = await this.executeQuery(simpleTestQuery);
       
       if (response?.data?.__schema) {
-        console.log('✅ Bitquery API Schema verfügbar');
-        console.log('📋 Verfügbare Types:', response.data.__schema.types.slice(0, 10).map((t: any) => t.name));
+        console.log('✅ Bitquery API Schema erreichbar');
+        console.log('📋 Query Type:', response.data.__schema.queryType?.name);
+        
+        // TESTE SOLANA-VERFÜGBARKEIT
+        const solanaTestQuery = `
+          query TestSolana {
+            __type(name: "RootQuery") {
+              fields {
+                name
+                type {
+                  name
+                }
+              }
+            }
+          }
+        `;
+        
+        console.log('🔍 Teste Solana-Verfügbarkeit...');
+        const solanaResponse = await this.executeQuery(solanaTestQuery);
+        console.log('📊 RootQuery fields:', JSON.stringify(solanaResponse?.data?.__type?.fields?.slice(0, 10), null, 2));
+        
         return true;
       } else {
         console.error('❌ Unerwartete Schema-Antwort von Bitquery API');
+        console.error('Response:', JSON.stringify(response, null, 2));
         return false;
       }
     } catch (error) {
-      console.error('❌ Bitquery API Introspection fehlgeschlagen:', error);
+      console.error('❌ Bitquery API Test fehlgeschlagen:', error);
       
-      // FALLBACK: Teste einfachste Query
-      const simpleQuery = `
-        query TestQuery {
+      // TESTE ALTERNATIVE API-STRUKTUR
+      const alternativeQuery = `
+        {
           __typename
         }
       `;
       
       try {
-        console.log('🔄 Versuche einfache Basis-Query...');
-        const simpleResponse = await this.executeQuery(simpleQuery);
-        console.log('📝 Einfache Query Response:', simpleResponse);
-        return simpleResponse !== null;
-      } catch (simpleError) {
-        console.error('❌ Auch einfache Query fehlgeschlagen:', simpleError);
-        return false;
+        console.log('🔄 Versuche alternative Basis-Query...');
+        const alternativeResponse = await this.executeQuery(alternativeQuery);
+        console.log('📝 Alternative Query Response:', JSON.stringify(alternativeResponse, null, 2));
+        return alternativeResponse !== null;
+      } catch (altError) {
+        console.error('❌ Auch alternative Query fehlgeschlagen:', altError);
+        
+        // TESTE MIT VERSCHIEDENEN ENDPUNKTEN
+        console.log('🔄 Teste mit verschiedenen API-Endpunkten...');
+        
+        // Teste V1 API
+        const originalUrl = this.baseUrl;
+        this.baseUrl = 'https://graphql.bitquery.io';
+        
+        try {
+          console.log('🔄 Teste V1 API Endpunkt...');
+          const v1Response = await this.executeQuery(alternativeQuery);
+          console.log('📝 V1 API Response:', JSON.stringify(v1Response, null, 2));
+          return v1Response !== null;
+        } catch (v1Error) {
+          console.error('❌ V1 API auch fehlgeschlagen:', v1Error);
+          this.baseUrl = originalUrl; // Stelle ursprüngliche URL wieder her
+          return false;
+        }
       }
     }
   }
@@ -1334,6 +1371,72 @@ export class BitqueryAPI {
     } catch (error) {
       console.error(`❌ Failed to get day history for ${tokenAddress}:`, error);
       return [];
+    }
+  }
+
+  /**
+   * DEBUG: Prüft API-Konfiguration und Authentifizierung
+   */
+  async debugAPIConfig(): Promise<void> {
+    console.log('🔧 BITQUERY API DEBUG CONFIGURATION:');
+    console.log('📍 Base URL:', this.baseUrl);
+    console.log('🔑 API Key (first 10 chars):', this.apiKey?.slice(0, 10) + '...');
+    console.log('🆔 Project ID:', this.projectId);
+    console.log('🔐 Secret (first 5 chars):', this.secret?.slice(0, 5) + '...');
+    
+    // Teste verschiedene Header-Konfigurationen
+    const testHeaders: Array<{
+      name: string;
+      headers: Record<string, string>;
+    }> = [
+      {
+        name: 'Bearer Token (V2 EAP)',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        }
+      },
+      {
+        name: 'X-API-KEY (V1 Style)',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': this.apiKey,
+        }
+      },
+      {
+        name: 'Authorization Basic',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${Buffer.from(`${this.projectId}:${this.secret}`).toString('base64')}`,
+        }
+      }
+    ];
+    
+    for (const config of testHeaders) {
+      console.log(`\n🧪 Teste ${config.name}...`);
+      try {
+        const response = await fetch(this.baseUrl, {
+          method: 'POST',
+          headers: config.headers,
+          body: JSON.stringify({ 
+            query: '{ __typename }',
+            variables: {},
+            operationName: null
+          })
+        });
+        
+        console.log(`📊 Status: ${response.status} ${response.statusText}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ Response:`, JSON.stringify(data, null, 2));
+        } else {
+          const errorText = await response.text();
+          console.log(`❌ Error Response:`, errorText);
+        }
+      } catch (error) {
+        console.log(`❌ Fetch Error:`, error);
+      }
     }
   }
 } 
