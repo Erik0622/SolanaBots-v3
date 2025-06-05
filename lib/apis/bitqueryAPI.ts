@@ -139,7 +139,7 @@ export class BitqueryAPI {
     // KORRIGIERTE QUERY basierend auf aktueller Bitquery V2 EAP API-Dokumentation
     const query = `
       query EnhancedRaydiumTokens {
-        Solana(dataset: realtime) {
+        Solana {
           DEXTradeByTokens(
             where: {
               Trade: {
@@ -173,7 +173,6 @@ export class BitqueryAPI {
             Block {
               Time
             }
-            # ERWEITERTE AGGREGATIONS-DATEN
             count
             uniqueTraders: count(distinct: Transaction_Signer)
             buyVolume: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: buy}}}})
@@ -527,7 +526,7 @@ export class BitqueryAPI {
 
     const query = `
       query Token5MinuteHistory {
-        Solana(dataset: realtime) {
+        Solana {
           DEXTrades(
             where: {
               Trade: {
@@ -642,7 +641,7 @@ export class BitqueryAPI {
   async checkPumpFunMigration(tokenAddress: string): Promise<BitqueryMigrationData | null> {
     const query = `
       query CheckMigration {
-        Solana(dataset: realtime) {
+        Solana {
           DEXTrades(
             where: {
               Trade: { Currency: { MintAddress: { is: "${tokenAddress}" } } }
@@ -810,7 +809,7 @@ export class BitqueryAPI {
     
     const simpleQuery = `
       query DebugRaydium {
-        Solana(dataset: realtime) {
+        Solana {
           DEXTradeByTokens(
             where: {
               Trade: {
@@ -882,7 +881,7 @@ export class BitqueryAPI {
     
     const fallbackQuery = `
       query FallbackRaydiumTokens {
-        Solana(dataset: realtime) {
+        Solana {
           DEXTradeByTokens(
             where: {
               Trade: {
@@ -1049,7 +1048,7 @@ export class BitqueryAPI {
     
     const query = `
       query TokensCreatedBeforeDate {
-        Solana(dataset: combined) {
+        Solana {
           DEXTradeByTokens(
             where: {
               Block: { 
@@ -1061,7 +1060,7 @@ export class BitqueryAPI {
                 Dex: { 
                   ProtocolFamily: { in: ["Raydium"] }
                 }
-                AmountInUSD: { gt: 50 } # Niedrigere Schwelle für historische Daten
+                AmountInUSD: { gt: 50 }
               }
               Transaction: { Result: { Success: true } }
             }
@@ -1220,7 +1219,7 @@ export class BitqueryAPI {
     
     const query = `
       query TokenDayHistory {
-        Solana(dataset: realtime) {
+        Solana {
           DEXTrades(
             where: {
               Block: { 
