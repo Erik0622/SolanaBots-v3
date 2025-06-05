@@ -764,7 +764,13 @@ export class BitqueryAPI {
               name
               type {
                 name
+                kind
+                ofType {
+                  name
+                  kind
+                }
               }
+              description
             }
           }
         }
@@ -772,70 +778,57 @@ export class BitqueryAPI {
     `;
 
     try {
-      console.log('🧪 Teste Bitquery API mit Introspection Query...');
+      console.log('🧪 Teste Bitquery API mit vollständiger Schema-Introspection...');
       await this.handleRateLimit();
       const response = await this.executeQuery(introspectionQuery);
       
       if (response?.data?.__schema?.queryType?.fields) {
         console.log('✅ Bitquery API Schema erreichbar');
         const fields = response.data.__schema.queryType.fields;
-        console.log(`📋 Verfügbare Root Query Fields (${fields.length} total):`);
+        console.log(`📋 ALLE verfügbaren Root Query Fields (${fields.length} total):`);
         
-        // Zeige alle verfügbaren Root-Fields
+        // Zeige ALLE Root-Fields
         fields.forEach((field: any, index: number) => {
-          if (index < 20) { // Zeige nur erste 20
-            console.log(`   ${index + 1}. ${field.name} (Type: ${field.type?.name || 'Complex'})`);
+          console.log(`   ${index + 1}. ${field.name} (Type: ${field.type?.name || field.type?.kind || 'Complex'})`);
+          if (field.description) {
+            console.log(`      Description: ${field.description}`);
           }
         });
         
-        // Suche explizit nach Solana-Fields
-        const solanaFields = fields.filter((field: any) => 
+        // Suche explizit nach Solana-ähnlichen Fields
+        const solanaLikeFields = fields.filter((field: any) => 
           field.name.toLowerCase().includes('solana') || 
-          field.name.toLowerCase().includes('sol')
+          field.name.toLowerCase().includes('sol') ||
+          field.name === 'solana' ||
+          field.name === 'Solana' ||
+          field.name === 'SOL' ||
+          field.name === 'ethereum' || // Zum Vergleich
+          field.name === 'bitcoin'    // Zum Vergleich
         );
         
-        console.log(`🔍 Solana-related fields found (${solanaFields.length}):`);
-        solanaFields.forEach((field: any) => {
-          console.log(`   ✅ ${field.name} (Type: ${field.type?.name || 'Complex'})`);
+        console.log(`🔍 CRYPTO/BLOCKCHAIN-RELATED FIELDS FOUND (${solanaLikeFields.length}):`);
+        solanaLikeFields.forEach((field: any) => {
+          console.log(`   ✅ ${field.name} (Type: ${field.type?.name || field.type?.kind || 'Complex'})`);
+          if (field.description) {
+            console.log(`      Description: ${field.description}`);
+          }
         });
         
-        if (solanaFields.length === 0) {
-          console.error('❌ KEINE SOLANA-FELDER GEFUNDEN! Das ist das Problem.');
+        // Teste verschiedene mögliche Solana-Feldnamen
+        const possibleSolanaNames = ['solana', 'Solana', 'SOL', 'sol', 'SolanaMainnet', 'solanaMainnet'];
+        console.log('🔍 Testing different possible Solana field names...');
+        
+        for (const fieldName of possibleSolanaNames) {
+          const fieldExists = fields.some((f: any) => f.name === fieldName);
+          console.log(`   ${fieldName}: ${fieldExists ? '✅ EXISTS' : '❌ NOT FOUND'}`);
+        }
+        
+        if (solanaLikeFields.length === 0) {
+          console.error('❌ KEINE SOLANA-FELDER GEFUNDEN! Das ist das Hauptproblem.');
           console.log('🔄 Teste alternative API-Endpunkte...');
           
           // Teste V1 API
-          const originalUrl = this.baseUrl;
-          this.baseUrl = 'https://graphql.bitquery.io';
-          
-          try {
-            console.log('🔄 Teste V1 API Endpunkt...');
-            const v1Response = await this.executeQuery(introspectionQuery);
-            
-            if (v1Response?.data?.__schema?.queryType?.fields) {
-              const v1Fields = v1Response.data.__schema.queryType.fields;
-              const v1SolanaFields = v1Fields.filter((field: any) => 
-                field.name.toLowerCase().includes('solana') || 
-                field.name.toLowerCase().includes('sol')
-              );
-              
-              console.log(`📊 V1 API Solana fields found (${v1SolanaFields.length}):`);
-              v1SolanaFields.forEach((field: any) => {
-                console.log(`   ✅ ${field.name} (Type: ${field.type?.name || 'Complex'})`);
-              });
-              
-              if (v1SolanaFields.length > 0) {
-                console.log('✅ V1 API hat Solana-Support! Wechsle zu V1.');
-                // Behalte V1 URL
-                return true;
-              }
-            }
-          } catch (v1Error) {
-            console.error('❌ V1 API auch fehlgeschlagen:', v1Error);
-          }
-          
-          // Stelle ursprüngliche URL wieder her
-          this.baseUrl = originalUrl;
-          return false;
+          return await this.testV1API();
         }
         
         return true;
@@ -847,21 +840,113 @@ export class BitqueryAPI {
     } catch (error) {
       console.error('❌ Bitquery API Introspection fehlgeschlagen:', error);
       
-      // TESTE ALTERNATIVE API-STRUKTUR
-      const simpleQuery = `
-        {
-          __typename
+      // TESTE V1 API als Fallback
+      return await this.testV1API();
+    }
+  }
+
+  /**
+   * Teste V1 API als Fallback
+   */
+  private async testV1API(): Promise<boolean> {
+    const originalUrl = this.baseUrl;
+    const v1Url = 'https://graphql.bitquery.io';
+    
+    console.log(`🔄 Testing V1 API at: ${v1Url}`);
+    this.baseUrl = v1Url;
+    
+    try {
+      const introspectionQuery = `
+        query V1IntrospectionQuery {
+          __schema {
+            queryType {
+              fields {
+                name
+                type {
+                  name
+                  kind
+                }
+              }
+            }
+          }
         }
       `;
       
+      await this.handleRateLimit();
+      const response = await this.executeQuery(introspectionQuery);
+      
+      if (response?.data?.__schema?.queryType?.fields) {
+        const fields = response.data.__schema.queryType.fields;
+        const solanaFields = fields.filter((field: any) => 
+          field.name.toLowerCase().includes('solana') || 
+          field.name.toLowerCase().includes('sol')
+        );
+        
+        console.log(`📊 V1 API: ${fields.length} total fields, ${solanaFields.length} Solana-related`);
+        solanaFields.forEach((field: any) => {
+          console.log(`   ✅ V1: ${field.name} (Type: ${field.type?.name || field.type?.kind})`);
+        });
+        
+        if (solanaFields.length > 0) {
+          console.log('✅ V1 API hat Solana-Support! Verwende V1 API.');
+          // Behalte V1 URL
+          return true;
+        } else {
+          console.log('❌ V1 API hat auch keine Solana-Felder');
+        }
+      }
+    } catch (v1Error) {
+      console.error('❌ V1 API Test fehlgeschlagen:', v1Error);
+    }
+    
+    // Stelle ursprüngliche URL wieder her wenn V1 auch nicht funktioniert
+    this.baseUrl = originalUrl;
+    return false;
+  }
+
+  /**
+   * Teste bekannte Working Queries für verschiedene APIs
+   */
+  async testWorkingQueries(): Promise<void> {
+    console.log('🧪 === TESTING KNOWN WORKING QUERIES ===');
+    
+    const testQueries = [
+      {
+        name: 'Simple Schema Query',
+        query: `{ __schema { queryType { name } } }`
+      },
+      {
+        name: 'Root Types Query', 
+        query: `{ __type(name: "Query") { fields { name } } }`
+      },
+      {
+        name: 'Ethereum Test (common field)',
+        query: `{ ethereum { blocks(limit: {count: 1}) { height } } }`
+      },
+      {
+        name: 'Solana lowercase test',
+        query: `{ solana { blocks(limit: {count: 1}) { height } } }`
+      },
+      {
+        name: 'EVM Test',
+        query: `{ EVM { Blocks(limit: {count: 1}) { Block { Number } } } }`
+      }
+    ];
+    
+    for (const test of testQueries) {
+      console.log(`\n🧪 Testing: ${test.name}`);
       try {
-        console.log('🔄 Versuche einfache Basis-Query...');
-        const simpleResponse = await this.executeQuery(simpleQuery);
-        console.log('📝 Einfache Query Response:', JSON.stringify(simpleResponse, null, 2));
-        return simpleResponse !== null;
-      } catch (simpleError) {
-        console.error('❌ Auch einfache Query fehlgeschlagen:', simpleError);
-        return false;
+        await this.handleRateLimit();
+        const response = await this.executeQuery(test.query);
+        
+        console.log(`✅ ${test.name} SUCCESS`);
+        console.log(`   Response keys:`, Object.keys(response?.data || {}));
+        
+        if (response?.data) {
+          console.log(`   Data:`, JSON.stringify(response.data, null, 2).slice(0, 200) + '...');
+        }
+      } catch (error) {
+        console.log(`❌ ${test.name} FAILED:`, error instanceof Error ? error.message : 'Unknown error');
       }
     }
   }

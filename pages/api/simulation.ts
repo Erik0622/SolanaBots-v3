@@ -106,6 +106,10 @@ async function simulateWithBitqueryData(
     }
     addDebugLog('✅ Bitquery API connection successful');
     
+    // Test working queries
+    addDebugLog('🧪 === TESTING WORKING QUERIES ===');
+    await bitqueryAPI.testWorkingQueries();
+    
     // RUN 7-DAY PROGRESSIVE SIMULATION
     const simulationResult = await runSevenDayProgressiveSimulation(bitqueryAPI, botType, tokenCount);
     
