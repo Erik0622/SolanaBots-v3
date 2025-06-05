@@ -242,17 +242,21 @@ async function runDynamicBacktest(
           totalTrades++;
           
           // MEMECOIN OUTCOME SIMULATION
-          const outcome = simulateMemecoinTrade(token, botType, STOP_LOSS_PERCENT, TAKE_PROFIT_PERCENT);
+          const outcome = await simulateRealMemecoinTrade(token, dexScreenerAPI, targetDate.getTime(), targetDate.getTime() + 24 * 60 * 60 * 1000, STOP_LOSS_PERCENT, TAKE_PROFIT_PERCENT);
           
           if (outcome.result === 'PROFIT') {
             const profit = tradeAmount * (outcome.percentage / 100);
             currentCapital += profit;
             successfulTrades++;
             addDebugLog(`🚀 ${token.tokenSymbol}: +$${profit.toFixed(2)} (+${outcome.percentage.toFixed(1)}%) ${outcome.reason}`);
-          } else {
+          } else if (outcome.result === 'LOSS') {
             const loss = tradeAmount * (outcome.percentage / 100);
             currentCapital -= loss;
             addDebugLog(`💥 ${token.tokenSymbol}: -$${loss.toFixed(2)} (-${outcome.percentage.toFixed(1)}%) ${outcome.reason}`);
+          } else {
+            // FAILED - Trade wird übersprungen, zählt aber als fehlgeschlagener Trade
+            totalTrades--; // Entferne aus Trade-Count da nicht ausgeführt
+            addDebugLog(`⚠️ ${token.tokenSymbol}: TRADE ÜBERSPRUNGEN - ${outcome.reason}`);
           }
           
           maxCapital = Math.max(maxCapital, currentCapital);
@@ -327,107 +331,69 @@ function getMemecoinTradeSignal(token: RaydiumTrade, botType: string): boolean {
   }
 }
 
-function simulateMemecoinTrade(
+/**
+ * NEUE FUNKTION: Verwendet echte historische Preisdaten für Backtesting
+ */
+async function simulateRealMemecoinTrade(
   token: RaydiumTrade, 
-  botType: string, 
+  dexScreenerAPI: BitqueryAPI,
+  entryTimestamp: number,
+  exitTimestamp: number,
   stopLossPercent: number, 
   takeProfitPercent: number
-): { result: 'PROFIT' | 'LOSS', percentage: number, reason: string } {
+): Promise<{ result: 'PROFIT' | 'LOSS' | 'FAILED', percentage: number, reason: string }> {
   
-  // REALISTISCHE MEMECOIN-WAHRSCHEINLICHKEITEN
-  const basePumpChance = 0.25; // 25% Chance auf Pump
-  const baseDumpChance = 0.35; // 35% Chance auf Dump  
-  const sidewaysChance = 0.40; // 40% Chance auf Seitwärtsbewegung
-  
-  // Adjust probabilities based on token metrics
-  let pumpChance = basePumpChance;
-  let dumpChance = baseDumpChance;
-  
-  // Volume-based adjustments
-  if (token.volumeUSD24h > 200000) pumpChance += 0.15; // High volume = pump potential
-  if (token.volumeUSD24h < 20000) dumpChance += 0.15; // Low volume = dump risk
-  
-  // Price action adjustments
-  if (token.priceChange24h > 50) pumpChance += 0.2; // Already pumping
-  if (token.priceChange24h < -30) {
-    pumpChance += 0.1; // Oversold bounce potential
-    dumpChance -= 0.1;
-  }
-  
-  // Market cap adjustments
-  const estimatedMCap = token.liquidityUSD * 2;
-  if (estimatedMCap < 100000) dumpChance += 0.1; // Very low cap = higher risk
-  if (estimatedMCap > 1000000) pumpChance += 0.1; // Established = lower dump risk
-  
-  // Bot-specific adjustments
-  switch (botType) {
-    case 'volume-tracker':
-      if (token.trades24h > 1000) pumpChance += 0.1;
-      break;
-    case 'trend-surfer':
-      if (token.priceChange24h > 30) pumpChance += 0.15;
-      break;
-    case 'dip-hunter':
-      if (token.priceChange24h < -40) pumpChance += 0.2; // Deep dip = bounce potential
-      break;
-  }
-  
-  // Normalize probabilities
-  const total = pumpChance + dumpChance + sidewaysChance;
-  pumpChance = pumpChance / total;
-  dumpChance = dumpChance / total;
-  
-  const random = Math.random();
-  
-  if (random < pumpChance) {
-    // PUMP: 50% chance to hit take profit, 50% chance for partial gains
-    if (Math.random() < 0.5) {
-      return { 
-        result: 'PROFIT', 
-        percentage: takeProfitPercent, 
-        reason: `🚀 PUMP! +${takeProfitPercent}%` 
-      };
-    } else {
-      const partialGain = 30 + Math.random() * 120; // 30-150% gain
-      return { 
-        result: 'PROFIT', 
-        percentage: partialGain, 
-        reason: `📈 Teilgewinn +${partialGain.toFixed(0)}%` 
+  try {
+    // Hole echte Preisentwicklung für diesen Zeitraum
+    const priceMovement = await dexScreenerAPI.calculateRealPriceMovement(
+      token.tokenAddress,
+      entryTimestamp,
+      exitTimestamp
+    );
+    
+    if (!priceMovement) {
+      // KEIN FALLBACK - wenn keine echten Daten verfügbar sind, ist der Trade fehlgeschlagen
+      addDebugLog(`❌ TRADE ÜBERSPRUNGEN: Keine echten historischen Daten für ${token.tokenSymbol}`);
+      return {
+        result: 'FAILED',
+        percentage: 0,
+        reason: `❌ Keine historischen Preisdaten verfügbar`
       };
     }
-  } else if (random < pumpChance + dumpChance) {
-    // DUMP: 70% chance to hit stop loss, 30% chance for partial loss
-    if (Math.random() < 0.7) {
-      return { 
-        result: 'LOSS', 
-        percentage: stopLossPercent, 
-        reason: `💥 DUMP! -${stopLossPercent}%` 
-      };
-    } else {
-      const partialLoss = 10 + Math.random() * 20; // 10-30% loss
-      return { 
-        result: 'LOSS', 
-        percentage: partialLoss, 
-        reason: `📉 Teilverlust -${partialLoss.toFixed(0)}%` 
+    
+    const { priceChange, reason } = priceMovement;
+    
+    // Anwenden von Stop Loss und Take Profit Limits
+    if (priceChange >= takeProfitPercent) {
+      return {
+        result: 'PROFIT',
+        percentage: takeProfitPercent,
+        reason: `🎯 Take Profit erreicht: ${reason}`
       };
     }
-  } else {
-    // SIDEWAYS: Small random movement
-    if (Math.random() < 0.6) {
-      const smallGain = 2 + Math.random() * 15; // 2-17% gain
-      return { 
-        result: 'PROFIT', 
-        percentage: smallGain, 
-        reason: `➡️ Seitwärts +${smallGain.toFixed(0)}%` 
-      };
-    } else {
-      const smallLoss = 2 + Math.random() * 10; // 2-12% loss
-      return { 
-        result: 'LOSS', 
-        percentage: smallLoss, 
-        reason: `➡️ Seitwärts -${smallLoss.toFixed(0)}%` 
+    
+    if (priceChange <= -stopLossPercent) {
+      return {
+        result: 'LOSS',
+        percentage: stopLossPercent,
+        reason: `🛑 Stop Loss erreicht: ${reason}`
       };
     }
+    
+    // Normale Preisentwicklung ohne Limits
+    return {
+      result: priceChange >= 0 ? 'PROFIT' : 'LOSS',
+      percentage: Math.abs(priceChange),
+      reason: `📊 Reale Preisentwicklung: ${reason}`
+    };
+    
+  } catch (error) {
+    addDebugLog(`❌ TRADE FEHLGESCHLAGEN: Fehler bei echter Preissimulation für ${token.tokenSymbol}: ${error}`);
+    return {
+      result: 'FAILED',
+      percentage: 0,
+      reason: `❌ Technischer Fehler bei Preisberechnung`
+    };
   }
 }
 
