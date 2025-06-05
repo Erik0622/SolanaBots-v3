@@ -136,7 +136,7 @@ export class BitqueryAPI {
     // ENTFERNE ZEITFILTER FÜR DEBUGGING
     console.log('🐛 DEBUG: Verwende erweiterte Bitquery-Datenfelder (Buy/Sell-Volume, Trader-Counts, etc.)...');
     
-    // ERWEITERTE QUERY mit mehr verfügbaren Bitquery-Daten
+    // KORRIGIERTE QUERY basierend auf aktueller Bitquery V2 EAP API-Dokumentation
     const query = `
       query EnhancedRaydiumTokens {
         Solana {
@@ -174,7 +174,7 @@ export class BitqueryAPI {
               Time
             }
             # ERWEITERTE AGGREGATIONS-DATEN
-            count: count
+            count
             uniqueTraders: count(distinct: Transaction_Signer)
             buyVolume: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: buy}}}})
             sellVolume: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: sell}}}})
