@@ -217,23 +217,21 @@ async function runDynamicBacktest(
       const allCurrentTokens = await dexScreenerAPI.getFreshRaydiumTokens(168, 10000); // 7 Tage, 10k min MCap
       
       // SIMULIERE: Welche Token waren zu diesem Backtesting-Tag frisch migriert?
-      // (innerhalb der letzten 24h vor diesem Tag, aber nicht in den ersten 25min)
+      // VEREINFACHTE LOGIK: Deterministische Token-Verfügbarkeit pro Tag
       const freshlyMigratedTokens = allCurrentTokens.filter(token => {
-        // Simuliere Migration-Zeitpunkt für diesen Token basierend auf dessen Eigenschaften
-        const migrationHash = createSimpleHash(token.tokenAddress + 'migration');
-        const migrationDaysAgo = 1 + (migrationHash % 7); // Token migriert vor 1-7 Tagen
+        // Deterministische Verfügbarkeit basierend auf Tag + Token-Adresse
+        const hash = createSimpleHash(dateString + token.tokenAddress);
+        const availabilityChance = 0.3; // 30% der Token sind an einem Tag verfügbar
+        const isAvailable = (hash % 100) < (availabilityChance * 100);
         
-        // War dieser Token in den letzten 1-2 Tagen vor diesem Backtesting-Tag frisch migriert?
-        const wasFreshInTimeframe = migrationDaysAgo >= (daysAgo - 1) && migrationDaysAgo <= (daysAgo + 1);
-        
-        // Zusätzliche Realismus-Filter für frische Raydium-Migration
+        // Zusätzliche Filter für realistische Memecoins
         const estimatedMCap = token.liquidityUSD * 2;
-        const meetsCriteria = estimatedMCap >= 50000 && // > 50k Market Cap
-                             estimatedMCap <= 100000000 && // < 100M (nicht zu etabliert)
-                             token.volumeUSD24h >= 1000 && // Mindest-Aktivität
-                             token.trades24h >= 20; // Echte Trading-Aktivität
+        const meetsCriteria = estimatedMCap >= 10000 && // > 10k Market Cap (weniger restriktiv)
+                             estimatedMCap <= 50000000 && // < 50M (nicht zu etabliert)
+                             token.volumeUSD24h >= 500 && // Mindest-Aktivität (reduziert)
+                             token.trades24h >= 10; // Echte Trading-Aktivität (reduziert)
         
-        return wasFreshInTimeframe && meetsCriteria;
+        return isAvailable && meetsCriteria;
       });
       
       // SIMULIERE: 25min Wartezeit nach Migration ignorieren
