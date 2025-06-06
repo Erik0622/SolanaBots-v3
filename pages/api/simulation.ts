@@ -264,13 +264,16 @@ async function runDynamicBacktest(
         if (currentCapital < 100) break; // Min trade size increased for memecoins
         
         const shouldTrade = getMemecoinTradeSignal(token, botType);
+        addDebugLog(`🤔 ${token.tokenSymbol}: Trade-Signal = ${shouldTrade} (${botType})`);
         
         if (shouldTrade) {
           const tradeAmount = currentCapital * (POSITION_SIZE_PERCENT / 100); // 10% position size
           totalTrades++;
+          addDebugLog(`💰 TRADING ${token.tokenSymbol}: $${tradeAmount.toFixed(2)} (${POSITION_SIZE_PERCENT}% von $${currentCapital.toFixed(2)})`);
           
           // MEMECOIN OUTCOME SIMULATION
           const outcome = await simulateRealMemecoinTrade(token, dexScreenerAPI, targetDate.getTime(), targetDate.getTime() + 24 * 60 * 60 * 1000, STOP_LOSS_PERCENT, TAKE_PROFIT_PERCENT);
+          addDebugLog(`📈 ${token.tokenSymbol} Ergebnis: ${outcome.result} (${outcome.percentage.toFixed(1)}%) - ${outcome.reason}`);
           
           if (outcome.result === 'PROFIT') {
             const profit = tradeAmount * (outcome.percentage / 100);
