@@ -213,8 +213,8 @@ async function runDynamicBacktest(
       // ECHTE FRISCH-MIGRIERTE TOKEN-LOGIK für diesen spezifischen Backtesting-Tag
       addDebugLog(`🔍 Suche Token die am ${dateString} frisch zu Raydium migriert waren...`);
       
-      // Hole alle verfügbaren Token ohne Age-Einschränkung für Backtesting
-      const allCurrentTokens = await dexScreenerAPI.getEnhancedRaydiumTokens(); // Ohne Age-Filter!
+      // Hole echte frische MEMECOINS - KEINE etablierten Token!
+      const allCurrentTokens = await dexScreenerAPI.getRealFreshMemecoins(); // ECHTE MEMECOINS!
       
       // DEBUG: Zeige was die API zurückgibt
       addDebugLog(`🔍 API lieferte ${allCurrentTokens.length} Token:`);
