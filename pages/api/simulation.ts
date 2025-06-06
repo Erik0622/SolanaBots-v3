@@ -213,18 +213,18 @@ async function runDynamicBacktest(
       // ECHTE FRISCH-MIGRIERTE TOKEN-LOGIK für diesen spezifischen Backtesting-Tag
       addDebugLog(`🔍 Suche Token die am ${dateString} frisch zu Raydium migriert waren...`);
       
-      // Hole alle aktuellen Token als Basis
-      const allCurrentTokens = await dexScreenerAPI.getEnhancedRaydiumTokens();
+      // Hole mehr Token mit weniger restriktiven Kriterien
+      const allCurrentTokens = await dexScreenerAPI.getFreshRaydiumTokens(168, 10000); // 7 Tage, 10k min MCap
       
       // SIMULIERE: Welche Token waren zu diesem Backtesting-Tag frisch migriert?
       // (innerhalb der letzten 24h vor diesem Tag, aber nicht in den ersten 25min)
       const freshlyMigratedTokens = allCurrentTokens.filter(token => {
         // Simuliere Migration-Zeitpunkt für diesen Token basierend auf dessen Eigenschaften
         const migrationHash = createSimpleHash(token.tokenAddress + 'migration');
-        const migrationDaysAgo = 1 + (migrationHash % 30); // Token migriert vor 1-30 Tagen
+        const migrationDaysAgo = 1 + (migrationHash % 7); // Token migriert vor 1-7 Tagen
         
-        // War dieser Token an diesem Backtesting-Tag frisch migriert?
-        const wasFreshOnThisDay = migrationDaysAgo === daysAgo;
+        // War dieser Token in den letzten 1-2 Tagen vor diesem Backtesting-Tag frisch migriert?
+        const wasFreshInTimeframe = migrationDaysAgo >= (daysAgo - 1) && migrationDaysAgo <= (daysAgo + 1);
         
         // Zusätzliche Realismus-Filter für frische Raydium-Migration
         const estimatedMCap = token.liquidityUSD * 2;
@@ -233,7 +233,7 @@ async function runDynamicBacktest(
                              token.volumeUSD24h >= 1000 && // Mindest-Aktivität
                              token.trades24h >= 20; // Echte Trading-Aktivität
         
-        return wasFreshOnThisDay && meetsCriteria;
+        return wasFreshInTimeframe && meetsCriteria;
       });
       
       // SIMULIERE: 25min Wartezeit nach Migration ignorieren
