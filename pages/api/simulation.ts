@@ -214,24 +214,19 @@ async function runDynamicBacktest(
       addDebugLog(`🔍 Suche Token die am ${dateString} frisch zu Raydium migriert waren...`);
       
       // Hole mehr Token mit weniger restriktiven Kriterien
-      const allCurrentTokens = await dexScreenerAPI.getFreshRaydiumTokens(168, 10000); // 7 Tage, 10k min MCap
+      const allCurrentTokens = await dexScreenerAPI.getFreshRaydiumTokens(168, 50000); // 7 Tage, 50k min MCap
       
-      // SIMULIERE: Welche Token waren zu diesem Backtesting-Tag frisch migriert?
-      // VEREINFACHTE LOGIK: Deterministische Token-Verfügbarkeit pro Tag
+      // ALLE TOKEN DIE DIE KRITERIEN ERFÜLLEN SIND VERFÜGBAR
+      // KEINE künstliche Verfügbarkeits-Simulation!
       const freshlyMigratedTokens = allCurrentTokens.filter(token => {
-        // Deterministische Verfügbarkeit basierend auf Tag + Token-Adresse
-        const hash = createSimpleHash(dateString + token.tokenAddress);
-        const availabilityChance = 0.3; // 30% der Token sind an einem Tag verfügbar
-        const isAvailable = (hash % 100) < (availabilityChance * 100);
-        
-        // Zusätzliche Filter für realistische Memecoins
+        // Filter für realistische Memecoins - ALLE die passen sind verfügbar
         const estimatedMCap = token.liquidityUSD * 2;
-        const meetsCriteria = estimatedMCap >= 10000 && // > 10k Market Cap (weniger restriktiv)
-                             estimatedMCap <= 50000000 && // < 50M (nicht zu etabliert)
-                             token.volumeUSD24h >= 500 && // Mindest-Aktivität (reduziert)
-                             token.trades24h >= 10; // Echte Trading-Aktivität (reduziert)
+        const meetsCriteria = estimatedMCap >= 50000 && // > 50k Market Cap (wie gewünscht)
+                             estimatedMCap <= 100000000 && // < 100M (nicht zu etabliert)
+                             token.volumeUSD24h >= 1000 && // Mindest-Aktivität
+                             token.trades24h >= 20; // Echte Trading-Aktivität
         
-        return isAvailable && meetsCriteria;
+        return meetsCriteria; // Alle Token die die Kriterien erfüllen!
       });
       
       // SIMULIERE: 25min Wartezeit nach Migration ignorieren
