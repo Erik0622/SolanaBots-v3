@@ -217,22 +217,10 @@ async function runDynamicBacktest(
       const allCurrentTokens = await dexScreenerAPI.getEnhancedRaydiumTokens(); // Ohne Age-Filter!
       
       // ALLE TOKEN DIE DIE KRITERIEN ERFÜLLEN SIND VERFÜGBAR
-      // KEINE künstliche Verfügbarkeits-Simulation!
-      const freshlyMigratedTokens = allCurrentTokens.filter(token => {
-        // Filter für realistische Memecoins - ALLE die passen sind verfügbar
-        const estimatedMCap = token.liquidityUSD * 2;
-        const meetsCriteria = estimatedMCap >= 50000 && // > 50k Market Cap (wie gewünscht)
-                             estimatedMCap <= 100000000 && // < 100M (nicht zu etabliert)
-                             token.volumeUSD24h >= 1000 && // Mindest-Aktivität
-                             token.trades24h >= 20; // Echte Trading-Aktivität
-        
-        return meetsCriteria; // Alle Token die die Kriterien erfüllen!
-      });
+      // KEINE zusätzlichen Filter - verwende alle API-Token!
+      const freshlyMigratedTokens = allCurrentTokens; // Alle Token von der API sind bereits gefiltert
       
-      // SIMULIERE: 25min Wartezeit nach Migration ignorieren
-      // Alle gefundenen Token sind bereits "handelbar" (25min+ nach Migration)
-      
-      addDebugLog(`📊 ${allCurrentTokens.length} Token total → ${freshlyMigratedTokens.length} frisch migriert am ${dateString}`);
+      addDebugLog(`📊 ${allCurrentTokens.length} Token total → ${freshlyMigratedTokens.length} verfügbar für ${dateString}`);
       
       if (freshlyMigratedTokens.length === 0) {
         addDebugLog(`⚠️ Keine frisch migrierten Token für ${dateString} - überspringe Tag`);
