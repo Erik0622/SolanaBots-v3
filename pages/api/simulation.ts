@@ -213,8 +213,8 @@ async function runDynamicBacktest(
       // ECHTE FRISCH-MIGRIERTE TOKEN-LOGIK für diesen spezifischen Backtesting-Tag
       addDebugLog(`🔍 Suche Token die am ${dateString} frisch zu Raydium migriert waren...`);
       
-      // Hole mehr Token mit weniger restriktiven Kriterien
-      const allCurrentTokens = await dexScreenerAPI.getFreshRaydiumTokens(168, 50000); // 7 Tage, 50k min MCap
+      // Hole alle verfügbaren Token ohne Age-Einschränkung für Backtesting
+      const allCurrentTokens = await dexScreenerAPI.getEnhancedRaydiumTokens(); // Ohne Age-Filter!
       
       // ALLE TOKEN DIE DIE KRITERIEN ERFÜLLEN SIND VERFÜGBAR
       // KEINE künstliche Verfügbarkeits-Simulation!
