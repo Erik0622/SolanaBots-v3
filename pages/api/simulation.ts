@@ -216,11 +216,26 @@ async function runDynamicBacktest(
       // Hole alle verfügbaren Token ohne Age-Einschränkung für Backtesting
       const allCurrentTokens = await dexScreenerAPI.getEnhancedRaydiumTokens(); // Ohne Age-Filter!
       
-      // ALLE TOKEN DIE DIE KRITERIEN ERFÜLLEN SIND VERFÜGBAR
-      // KEINE zusätzlichen Filter - verwende alle API-Token!
-      const freshlyMigratedTokens = allCurrentTokens; // Alle Token von der API sind bereits gefiltert
+      // DEBUG: Zeige was die API zurückgibt
+      addDebugLog(`🔍 API lieferte ${allCurrentTokens.length} Token:`);
+      allCurrentTokens.slice(0, 3).forEach((token, i) => {
+        const estimatedMCap = token.liquidityUSD * 2;
+        addDebugLog(`   ${i + 1}. ${token.tokenSymbol}: MCap $${estimatedMCap.toLocaleString()}, Vol: $${token.volumeUSD24h.toLocaleString()}, Trades: ${token.trades24h}`);
+      });
       
-      addDebugLog(`📊 ${allCurrentTokens.length} Token total → ${freshlyMigratedTokens.length} verfügbar für ${dateString}`);
+      // FILTER FÜR 50K+ MARKET CAP UND TRADING-AKTIVITÄT
+      const freshlyMigratedTokens = allCurrentTokens.filter(token => {
+        // Filter für realistische Memecoins mit 50k+ Market Cap
+        const estimatedMCap = token.liquidityUSD * 2;
+        const meetsCriteria = estimatedMCap >= 50000 && // > 50k Market Cap (wie gewünscht)
+                             estimatedMCap <= 100000000 && // < 100M (nicht zu etabliert)
+                             token.volumeUSD24h >= 1000 && // Mindest-Aktivität
+                             token.trades24h >= 20; // Echte Trading-Aktivität
+        
+        return meetsCriteria;
+      });
+      
+      addDebugLog(`📊 ${allCurrentTokens.length} Token total → ${freshlyMigratedTokens.length} mit 50k+ MCap für ${dateString}`);
       
       if (freshlyMigratedTokens.length === 0) {
         addDebugLog(`⚠️ Keine frisch migrierten Token für ${dateString} - überspringe Tag`);
