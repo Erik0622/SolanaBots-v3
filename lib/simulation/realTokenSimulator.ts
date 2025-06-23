@@ -285,6 +285,9 @@ class PumpFunAPI {
   }
 }
 
+import { PumpFunHistoricalAPI, PumpFunTokenMeta, PumpFunOHLC } from '../apis/pumpFunHistoricalAPI';
+import { getHistoricalCandles, USDC_MINT } from '../jupiter/index';
+
 /**
  * Hauptklasse für echte Token-Simulation
  */
@@ -292,86 +295,68 @@ export class RealTokenSimulator {
   private birdeyeAPI = new BirdeyeAPI();
   private dexScreenerAPI = new DexScreenerAPI();
   private pumpFunAPI = new PumpFunAPI();
+  private pumpFunHistoricalAPI = new PumpFunHistoricalAPI();
   
   /**
-   * Holt echte Memecoin-Daten für Simulation
+   * Holt echte Token mit Market Cap >= 20.000 USD (letzte 24h)
+   * und berechnet priceChange24h und volume24h aus Jupiter Candles
    */
   async getRealMemecoinData(count: number = 20): Promise<RealTokenData[]> {
-    try {
-      console.log('Fetching real memecoin data for live simulation...');
-      
-      let realTokens: RealTokenData[] = [];
-      
-      // Nur server-seitig echte API-Aufrufe machen
-      if (typeof window === 'undefined') {
-        try {
-          console.log('Fetching new tokens from DexScreener (server-side)...');
-          const dexPairs = await this.dexScreenerAPI.getLatestMemecoinPairs();
-          
-          for (const pair of dexPairs) {
-            const tokenData = await this.processDexPair(pair);
-            if (tokenData && 
-                tokenData.marketCap > 50000 && // Mindestens 50k Market Cap
-                new Date(tokenData.createdAt).getTime() > Date.now() - (24 * 60 * 60 * 1000) // Jünger als 24h
-            ) {
-              realTokens.push(tokenData);
-              if (realTokens.length >= count) break;
-            }
-          }
-          console.log(`Fetched ${realTokens.length} new tokens from DexScreener`);
-          
-        } catch (err) {
-          console.error('DexScreener API failed:', err);
-        }
-        
-        // Wenn nicht genug Token von DexScreener, versuche Pump.fun
-        if (realTokens.length < count) {
-          try {
-            console.log('Fetching new tokens from Pump.fun (server-side)...');
-            const pumpTokens = await this.pumpFunAPI.getNewTokens(count * 2); // Mehr anfragen
-            
-            for (const token of pumpTokens) {
-              const tokenData = await this.processPumpToken(token);
-              if (tokenData && 
-                  tokenData.marketCap > 50000 && 
-                  new Date(tokenData.createdAt).getTime() > Date.now() - (24 * 60 * 60 * 1000) &&
-                  !realTokens.find(rt => rt.address === tokenData.address) // Duplikate vermeiden
-              ) {
-                realTokens.push(tokenData);
-                if (realTokens.length >= count) break;
-              }
-            }
-            console.log(`Added new tokens from Pump.fun`); // Angepasste Log-Nachricht
-            
-          } catch (err) {
-            console.error('Pump.fun API failed:', err);
-          }
-        }
+    // Hier: Annahme, dass du eine Token-Liste hast (z.B. aus Pump Fun API oder Jupiter Token List)
+    // Für Demo: Wir nehmen die Jupiter Token List und filtern nach Market Cap
+    const tokenList = await (await import('../jupiter/index')).loadTokenList();
+    const filtered = tokenList
+      .filter((t: any) => t.market_cap && t.market_cap >= 20000 && t.extensions?.coingeckoId)
+      .sort((a: any, b: any) => b.market_cap - a.market_cap)
+      .slice(0, count);
+    const tokens: RealTokenData[] = [];
+    for (const t of filtered) {
+      // Hole echte Candles (USDC als Quote)
+      const candles = await getHistoricalCandles(t.address, USDC_MINT.toString(), '5m');
+      let priceChange24h = 0;
+      let volume24h = 0;
+      if (candles.length > 1) {
+        const first = candles[0];
+        const last = candles[candles.length - 1];
+        priceChange24h = ((last.close - first.open) / first.open) * 100;
+        volume24h = candles.reduce((sum, c) => sum + (c.volume || 0), 0);
       }
-      
-      // Wenn APIs nicht verfügbar oder nicht genug Token, nutze Fallback
-      if (realTokens.length < count) {
-        console.log(`Not enough real tokens (${realTokens.length}), using fallback new memecoins...`);
-        const fallbackTokens = await this.generateFallbackNewMemecoins(count - realTokens.length);
-        realTokens = [...realTokens, ...fallbackTokens];
-      }
-      
-      // Stelle sicher, dass wir die gewünschte Anzahl an Token haben
-      realTokens = realTokens.slice(0, count);
-      
-      console.log(`Final token list for simulation (${realTokens.length} tokens):`);
-      realTokens.forEach(t => console.log(`  - ${t.symbol} (${t.address}), MC: $${t.marketCap}, Age: ${(Date.now() - new Date(t.createdAt).getTime()) / (60*60*1000)}h`));
-      
-      return realTokens;
-      
-    } catch (error) {
-      console.error('Error fetching real memecoin data, using fallback:', error);
-      return this.generateFallbackNewMemecoins(count);
+      tokens.push({
+        address: t.address,
+        symbol: t.symbol,
+        name: t.name,
+        price: candles.length > 0 ? candles[candles.length - 1].close : t.market_cap / 1_000_000_000,
+        priceChange24h,
+        volume24h,
+        marketCap: t.market_cap,
+        liquidityPool: 0, // Optional
+        holders: 0, // Optional
+        trades24h: 0, // Optional
+        dexes: ['Jupiter'],
+        createdAt: t?.createdAt || new Date().toISOString()
+      });
     }
+    return tokens;
+  }
+
+  /**
+   * Holt echte 5-Minuten-OHLC-Daten für einen Token (max. 24h)
+   */
+  async getTokenOHLC(tokenAddress: string, hours: number = 24): Promise<PriceData[]> {
+    const since = Math.floor((Date.now() - hours * 60 * 60 * 1000) / 1000);
+    const candles = await getHistoricalCandles(tokenAddress, USDC_MINT.toString(), '5m', since);
+    return candles.map(c => ({
+      timestamp: c.timestamp,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume
+    }));
   }
   
   /**
-   * Simuliert Bot-Performance basierend auf echten Token-Daten
+   * Simuliert Bot-Performance basierend auf echten Token-Daten (nur Jupiter Candles)
    */
   async simulateWithRealData(
     botType: string,
@@ -385,24 +370,14 @@ export class RealTokenSimulator {
     dataSource: 'real-api';
   }> {
     const tokens = await this.getRealMemecoinData(tokenCount);
-    
-    // Hole echte 7-Tage-Historien für die Token
-    const tokenAddresses = tokens.map(token => token.address);
-    const historicalData = await this.birdeyeAPI.getMultiTokenHistory(tokenAddresses);
-    
-    // Generiere synthetische Historien für Token ohne echte Daten
-    tokens.forEach(token => {
-      if (!historicalData.has(token.address)) {
-        const syntheticHistory = this.generateNewMemecoinHistory(token);
-        historicalData.set(token.address, syntheticHistory);
-      }
-    });
-    
-    console.log(`Total tokens with price history: ${historicalData.size}`);
-    
+    // Für jeden Token: Echte Jupiter Candles laden
+    const historicalData = new Map<string, PriceData[]>();
+    for (const token of tokens) {
+      const ohlc = await this.getTokenOHLC(token.address, 24);
+      historicalData.set(token.address, ohlc);
+    }
     // Berechne realistische Performance basierend auf echten Daten
     const performance = await this.calculateRealPerformance(botType, tokens, historicalData);
-    
     return {
       ...performance,
       tokens,

@@ -404,4 +404,34 @@ export function getTradingPairByMarketName(marketName: string): { baseMint: Publ
     default:
       return TradingPairs.SOL_USDC; // Standardfall
   }
+}
+
+/**
+ * Holt historische Candlestick-Daten (OHLCV) für ein Token-Paar von der Jupiter API
+ * interval: z.B. '5m', '1h', '1d'
+ * returns: Array von { timestamp, open, high, low, close, volume }
+ */
+export async function getHistoricalCandles(
+  baseMint: string,
+  quoteMint: string,
+  interval: '5m' | '1h' | '1d' = '5m',
+  since?: number // Unix-Timestamp in Sekunden
+): Promise<Array<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number }>> {
+  // Jupiter Candles API (offiziell, aber undocumented):
+  // https://stats.jup.ag/api/candles?market=<baseMint>-<quoteMint>&interval=5m
+  const market = `${baseMint}-${quoteMint}`;
+  let url = `https://stats.jup.ag/api/candles?market=${market}&interval=${interval}`;
+  if (since) url += `&startTime=${since}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Jupiter Candles API Fehler: ' + res.statusText);
+  const data = await res.json();
+  // Format: [{ time, open, high, low, close, volume }]
+  return (data || []).map((c: any) => ({
+    timestamp: c.time * 1000,
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+    volume: c.volume
+  }));
 } 

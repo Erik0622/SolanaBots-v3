@@ -710,130 +710,63 @@ export class BitqueryAPI {
     try {
       console.log('🔍 Suche nach echten frischen MEMECOINS - KEINE etablierten Token!');
       
-      await this.handleRateLimit();
+      // VERWENDE DIE FUNKTIONIERENDE getEnhancedRaydiumTokens() METHODE!
+      console.log('🔄 Lade alle Raydium-Token und filtere Memecoins...');
+      const allRaydiumTokens = await this.getEnhancedRaydiumTokens();
       
-      // Suche nach neuen Token-Pairs mit verschiedenen Strategien
-      const allFreshMemecoins: RaydiumTrade[] = [];
-      
-      // STRATEGIE 1: Trending-Token die keine Stablecoins oder Major-Token sind
-      try {
-        const trendingResponse = await axios.get('https://api.dexscreener.com/latest/dex/tokens/trending', {
-          timeout: 15000,
-          headers: {
-            'User-Agent': 'Solana-Trading-Bot/1.0'
-          }
-        });
-
-        if (Array.isArray(trendingResponse.data)) {
-          const freshMemecoins = trendingResponse.data.filter((token: any) => {
-            const isSolana = token.chainId === 'solana';
-            const hasPrice = token.priceUsd && parseFloat(token.priceUsd) > 0;
-            const hasVolume = token.volume?.h24 && parseFloat(token.volume.h24) > 1000;
-            
-            // WICHTIG: Filtere etablierte Token und Stablecoins raus!
-            const symbol = token.symbol?.toUpperCase() || '';
-            const isNotStablecoin = !['USDC', 'USDT', 'DAI', 'BUSD', 'FRAX'].includes(symbol);
-            const isNotMajorToken = !['SOL', 'BTC', 'ETH', 'BNB', 'WBTC', 'WETH'].includes(symbol);
-            const isNotWrapped = !symbol.startsWith('W') || symbol.length > 4; // Filtere WSOL etc.
-            
-            // Market Cap Filter für Memecoins
-            const estimatedMCap = token.liquidity?.usd ? parseFloat(token.liquidity.usd) * 2 : 0;
-            const isMemecoinRange = estimatedMCap >= 50000 && estimatedMCap <= 50000000; // 50k - 50M
-            
-            return isSolana && hasPrice && hasVolume && isNotStablecoin && 
-                   isNotMajorToken && isNotWrapped && isMemecoinRange;
-          });
-
-          console.log(`📊 Trending: ${freshMemecoins.length} echte Memecoins gefunden`);
-          
-          const memecoinData = freshMemecoins.map((token: any): RaydiumTrade => ({
-            tokenAddress: token.address || 'unknown',
-            tokenName: token.name || 'Unknown Memecoin',
-            tokenSymbol: token.symbol || 'MEME',
-            priceUSD: parseFloat(token.priceUsd || '0'),
-            volumeUSD24h: parseFloat(token.volume?.h24 || '0'),
-            priceChange24h: parseFloat(token.priceChange?.h24 || '0'),
-            liquidityUSD: parseFloat(token.liquidity?.usd || '0'),
-            trades24h: parseInt(token.txns?.h24?.buys || '0') + parseInt(token.txns?.h24?.sells || '0'),
-            timestamp: new Date().toISOString(),
-          }));
-          
-          allFreshMemecoins.push(...memecoinData);
-        }
-      } catch (trendingError) {
-        console.error('❌ Trending Memecoins Fehler:', trendingError instanceof Error ? trendingError.message : 'Unbekannt');
+      if (allRaydiumTokens.length === 0) {
+        console.log('❌ Keine Raydium-Token von API erhalten!');
+        return [];
       }
       
-      // STRATEGIE 2: Token-Pairs von Solana suchen und filtern
-      try {
-        const solanaResponse = await axios.get('https://api.dexscreener.com/latest/dex/pairs/solana', {
-          timeout: 15000,
-          headers: {
-            'User-Agent': 'Solana-Trading-Bot/1.0'
-          }
-        });
-
-        if (Array.isArray(solanaResponse.data?.pairs)) {
-          const freshPairs = solanaResponse.data.pairs.filter((pair: any) => {
-            const isRaydium = pair.dexId === 'raydium';
-            const hasPrice = pair.priceUsd && parseFloat(pair.priceUsd) > 0;
-            const hasVolume = pair.volume?.h24 && parseFloat(pair.volume.h24) > 500;
-            
-            // Filtere etablierte Token raus!
-            const baseSymbol = pair.baseToken?.symbol?.toUpperCase() || '';
-            const isNotStablecoin = !['USDC', 'USDT', 'DAI', 'BUSD'].includes(baseSymbol);
-            const isNotMajorToken = !['SOL', 'BTC', 'ETH', 'BNB', 'WBTC'].includes(baseSymbol);
-            const isNotWrapped = !baseSymbol.startsWith('W') || baseSymbol.length > 4;
-            
-            // Market Cap für Memecoins
-            const estimatedMCap = pair.liquidity?.usd ? parseFloat(pair.liquidity.usd) * 2 : 0;
-            const isMemecoinRange = estimatedMCap >= 50000 && estimatedMCap <= 100000000;
-            
-            return isRaydium && hasPrice && hasVolume && isNotStablecoin && 
-                   isNotMajorToken && isNotWrapped && isMemecoinRange;
-          });
-
-          console.log(`📊 Solana Pairs: ${freshPairs.length} Memecoin-Pairs gefunden`);
-          
-          const pairData = freshPairs.slice(0, 20).map((pair: any): RaydiumTrade => ({
-            tokenAddress: pair.baseToken?.address || 'unknown',
-            tokenName: pair.baseToken?.name || 'Unknown Memecoin',
-            tokenSymbol: pair.baseToken?.symbol || 'MEME',
-            priceUSD: parseFloat(pair.priceUsd || '0'),
-            volumeUSD24h: parseFloat(pair.volume?.h24 || '0'),
-            priceChange24h: parseFloat(pair.priceChange?.h24 || '0'),
-            liquidityUSD: parseFloat(pair.liquidity?.usd || '0'),
-            trades24h: parseInt(pair.txns?.h24?.buys || '0') + parseInt(pair.txns?.h24?.sells || '0'),
-            timestamp: new Date().toISOString(),
-          }));
-          
-          allFreshMemecoins.push(...pairData);
-        }
-      } catch (pairsError) {
-        console.error('❌ Solana Pairs Fehler:', pairsError instanceof Error ? pairsError.message : 'Unbekannt');
-      }
+      console.log(`📊 ${allRaydiumTokens.length} Raydium-Token erhalten, filtere für Memecoins...`);
       
-      // Deduplizierung und Filterung
-      const uniqueMemecoins = allFreshMemecoins.filter((token, index, self) => 
-        index === self.findIndex(t => t.tokenAddress === token.tokenAddress)
-      );
+      // Filtere für echte MEMECOINS (nicht etablierte Token)
+      const realMemecoins = allRaydiumTokens.filter(token => {
+        const symbol = token.tokenSymbol?.toUpperCase() || '';
+        const name = token.tokenName?.toUpperCase() || '';
+        
+        // RAUSFILTERN: Etablierte Token und Stablecoins
+        const isNotStablecoin = !['USDC', 'USDT', 'DAI', 'BUSD', 'FRAX', 'USDT', 'USDt'].includes(symbol);
+        const isNotMajorToken = !['SOL', 'BTC', 'ETH', 'BNB', 'WBTC', 'WETH', 'WSOL'].includes(symbol);
+        const isNotWrapped = !symbol.startsWith('W') || symbol.length > 4;
+        const isNotWIF = symbol !== 'WIF' && symbol !== '$WIF'; // WIF ist etabliert
+        
+        // Market Cap Filter für Memecoins (50k - 50M Range)
+        const estimatedMCap = token.liquidityUSD * 2; // Grobe Schätzung
+        const isMemecoinRange = estimatedMCap >= 50000 && estimatedMCap <= 50000000;
+        
+        // Activity Filter - echte Trading-Aktivität
+        const hasActivity = token.volumeUSD24h >= 1000 && token.trades24h >= 10;
+        
+        // Preis Filter - nicht zu teuer für Memecoins
+        const reasonablePrice = token.priceUSD > 0 && token.priceUSD < 100;
+        
+        return isNotStablecoin && isNotMajorToken && isNotWrapped && isNotWIF &&
+               isMemecoinRange && hasActivity && reasonablePrice;
+      });
       
-      // Sortiere nach Volume (absteigend) 
-      uniqueMemecoins.sort((a, b) => b.volumeUSD24h - a.volumeUSD24h);
+      console.log(`🎯 ${realMemecoins.length} echte Memecoins nach Filterung gefunden`);
       
-      console.log(`✅ ${uniqueMemecoins.length} echte frische Memecoins gefunden!`);
+      // Sortiere nach Activity (Volume + Trades) für beste Auswahl
+      realMemecoins.sort((a, b) => {
+        const scoreA = a.volumeUSD24h + (a.trades24h * 10); // Trades sind wichtig
+        const scoreB = b.volumeUSD24h + (b.trades24h * 10);
+        return scoreB - scoreA;
+      });
       
-      // Debug: Zeige gefundene Memecoins
-      uniqueMemecoins.slice(0, 5).forEach((token, i) => {
+      // Debug: Zeige Top 10 gefundene Memecoins
+      console.log(`📊 TOP MEMECOINS GEFUNDEN:`);
+      realMemecoins.slice(0, 10).forEach((token, i) => {
         const estimatedMCap = token.liquidityUSD * 2;
-        console.log(`${i + 1}. ${token.tokenSymbol}: MCap $${estimatedMCap.toLocaleString()}, Vol: $${token.volumeUSD24h.toLocaleString()}`);
+        console.log(`${i + 1}. ${token.tokenSymbol}: MCap $${estimatedMCap.toLocaleString()}, Vol: $${token.volumeUSD24h.toLocaleString()}, Price: $${token.priceUSD.toFixed(6)}`);
       });
 
-      return uniqueMemecoins.slice(0, 30); // Top 30 frische Memecoins
+      return realMemecoins.slice(0, 40); // Top 40 beste Memecoins
 
     } catch (error) {
       console.error('❌ Frische Memecoin Suche fehlgeschlagen:', error);
-      throw new Error(`Frische Memecoin Suche fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+      return []; // Leere Liste statt Error werfen
     }
   }
 }
