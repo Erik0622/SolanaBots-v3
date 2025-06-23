@@ -285,7 +285,6 @@ class PumpFunAPI {
   }
 }
 
-import { PumpFunHistoricalAPI, PumpFunTokenMeta, PumpFunOHLC } from '../apis/pumpFunHistoricalAPI';
 import { getHistoricalCandles, USDC_MINT } from '../jupiter/index';
 
 /**
@@ -295,7 +294,6 @@ export class RealTokenSimulator {
   private birdeyeAPI = new BirdeyeAPI();
   private dexScreenerAPI = new DexScreenerAPI();
   private pumpFunAPI = new PumpFunAPI();
-  private pumpFunHistoricalAPI = new PumpFunHistoricalAPI();
   
   /**
    * Holt echte Token mit Market Cap >= 20.000 USD (letzte 24h)
