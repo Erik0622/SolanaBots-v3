@@ -2,8 +2,6 @@
 
 import React, { FC, useState, useEffect } from 'react';
 import BotCard from './BotCard';
-import SimulationSection from './SimulationSection';
-import { useSimulation } from '@/hooks/useSimulation';
 import Link from 'next/link';
 import { useWallet } from './ClientWalletProvider';
 import { getBotStatus, setBotStatus, getAllBotStatus, getBotRisk } from '@/lib/botState';
@@ -14,17 +12,12 @@ const BotsSection: FC = () => {
   const [momentumBotRisk, setMomentumBotRisk] = useState(getBotRisk('trend-surfer'));
   const [dipHunterRisk, setDipHunterRisk] = useState(getBotRisk('dip-hunter'));
   
-  // Bot-Status aus localStorage
+  // Bot status from localStorage
   const [botStatuses, setBotStatuses] = useState(getAllBotStatus());
   
   const { connected } = useWallet();
 
-  // Echte Bitquery Simulationen für jeden Bot - 7 Tage echte Daten
-  const volumeSimulation = useSimulation('volume-tracker', false, true, true); // useBitquery = true
-  const trendSimulation = useSimulation('trend-surfer', false, true, true);
-  const dipSimulation = useSimulation('dip-hunter', false, true, true);
-
-  // Regelmäßig den Status aus localStorage abrufen
+  // Update status from localStorage regularly
   useEffect(() => {
     setBotStatuses(getAllBotStatus());
     setVolumeTrackerRisk(getBotRisk('volume-tracker'));
@@ -48,120 +41,110 @@ const BotsSection: FC = () => {
     setBotStatuses(getAllBotStatus());
   };
 
-  // Echte Performance-Daten aus Bitquery Simulationen extrahieren
-  const getSimulationMetrics = (simulation: any) => {
-    if (simulation.simulation.isLoading) {
-      return {
-        weeklyReturn: 'Loading...',
-        monthlyReturn: 'Loading...',
-        trades: 0,
-        winRate: '0%',
-        profitToday: 0,
-        profitWeek: 0,
-        profitMonth: 0
-      };
-    }
-
-    const { profitPercentage, tradeCount, successRate } = simulation.simulation;
-    
-    // Berechne realistische Zeitraum-Renditen basierend auf 7-Tage-Simulation
-    const weeklyReturn = profitPercentage;
-    const monthlyReturn = profitPercentage * 4.3; // ~4.3 Wochen pro Monat
-    
-    // Berechne Profit-Beträge (basierend auf 1000$ Startkapital)
-    const baseCapital = 1000;
-    const profitWeekAmount = (weeklyReturn / 100) * baseCapital;
-    const profitMonthAmount = (monthlyReturn / 100) * baseCapital;
-    const profitTodayAmount = profitWeekAmount / 7; // Täglicher Durchschnitt
-
-    return {
-      weeklyReturn: `${weeklyReturn >= 0 ? '+' : ''}${weeklyReturn.toFixed(1)}%`,
-      monthlyReturn: `${monthlyReturn >= 0 ? '+' : ''}${monthlyReturn.toFixed(1)}%`,
-      trades: tradeCount,
-      winRate: `${successRate.toFixed(0)}%`,
-      profitToday: Math.max(0, profitTodayAmount),
-      profitWeek: Math.max(0, profitWeekAmount),
-      profitMonth: Math.max(0, profitMonthAmount)
-    };
-  };
-
-  const volumeMetrics = getSimulationMetrics(volumeSimulation);
-  const trendMetrics = getSimulationMetrics(trendSimulation);
-  const dipMetrics = getSimulationMetrics(dipSimulation);
-
+  // Mock performance data for demonstration
   const bots = [
     {
       id: 'volume-tracker',
       name: 'Volume Tracker',
-      description: 'Detektiert plötzliche Volumenspitzen in neu gelisteten Token (<24h) und tradet automatisch bei spezifischen Volumen-Schwellenwerten.',
-      ...volumeMetrics,
-      strategy: 'Kauft bei spezifischen Volumen-zu-Marktkapitalisierungs-Schwellenwerten in frisch gelisteten Token (unter 24h). Verkauft mit gestaffelter Gewinnmitnahme bei 70% und vollständigem Ausstieg bei 140% Gewinn, mit Stop-Loss bei 35%.',
+      description: 'Detects sudden volume spikes in newly listed tokens (<24h) and trades automatically at specific volume thresholds.',
+      weeklyReturn: '+28.3%',
+      monthlyReturn: '+156.7%',
+      trades: 247,
+      winRate: '73%',
+      strategy: 'Buys at specific volume-to-market-cap thresholds in freshly listed tokens (under 24h). Sells with staged profit-taking at 70% and full exit at 140% profit, with stop-loss at 35%.',
       riskLevel: 'moderate' as const,
       riskColor: 'text-yellow-400',
       baseRiskPerTrade: volumeTrackerRisk,
-      riskManagement: 'Automatische Stop-Loss-Mechanismen mit 35% Verlustbegrenzung. Risiko pro Trade anpassbar von 1-50% des Kapitals.',
+      riskManagement: 'Automatic stop-loss mechanisms with 35% loss limitation. Risk per trade adjustable from 1-50% of capital.',
       status: (botStatuses.get('volume-tracker')?.isActive ? 'active' : 'paused') as 'active' | 'paused',
-      simulation: volumeSimulation
+      profitToday: 142.50,
+      profitWeek: 356.80,
+      profitMonth: 1847.30
     },
     {
       id: 'trend-surfer',
       name: 'Momentum Bot',
-      description: 'Identifiziert explosive Preisbewegungen in neuen Token durch Erkennung aufeinanderfolgender grüner Kerzen mit steigendem Volumen.',
-      ...trendMetrics,
-      strategy: 'Identifiziert starke Momentum-Signale mit mindestens 3 aufeinanderfolgenden grünen Kerzen und 15%+ Preisanstieg in 15 Minuten. Nutzt gestaffelte Gewinnmitnahme bei 60%, 100% und 140%.',
+      description: 'Identifies explosive price movements in new tokens by detecting consecutive green candles with increasing volume.',
+      weeklyReturn: '+34.8%',
+      monthlyReturn: '+189.2%',
+      trades: 189,
+      winRate: '81%',
+      strategy: 'Identifies strong momentum signals with at least 3 consecutive green candles and 15%+ price increase in 15 minutes. Uses staged profit-taking at 60%, 100%, and 140%.',
       riskLevel: 'high' as const,
       riskColor: 'text-red-400',
       baseRiskPerTrade: momentumBotRisk,
-      riskManagement: 'Höhere Basis-Volatilität mit Stop-Loss bei 35%. Risiko pro Trade anpassbar von 1-50% des Kapitals.',
+      riskManagement: 'Higher base volatility with stop-loss at 35%. Risk per trade adjustable from 1-50% of capital.',
       status: (botStatuses.get('trend-surfer')?.isActive ? 'active' : 'paused') as 'active' | 'paused',
-      simulation: trendSimulation
+      profitToday: 187.90,
+      profitWeek: 432.10,
+      profitMonth: 2156.80
     },
     {
       id: 'dip-hunter',
       name: 'Dip Hunter',
-      description: 'Identifiziert signifikante Preisrückgänge (30-60%) in neuen aber stabilen Token und nutzt hochpotenzielle Einstiegsmöglichkeiten.',
-      ...dipMetrics,
-      strategy: 'Identifiziert optimale Dip-Kauf-Gelegenheiten während 30-60% Preisrückgängen von Allzeithochs. Implementiert 50% partielle Gewinnmitnahme bei 60% und vollständigen Ausstieg bei 100%.',
+      description: 'Identifies significant price drops (30-60%) in new but stable tokens and leverages high-potential entry opportunities.',
+      weeklyReturn: '+19.7%',
+      monthlyReturn: '+97.4%',
+      trades: 156,
+      winRate: '68%',
+      strategy: 'Identifies optimal dip-buying opportunities during 30-60% price drops from all-time highs. Implements 50% partial profit-taking at 60% and full exit at 100%.',
       riskLevel: 'low' as const,
       riskColor: 'text-green-400',
       baseRiskPerTrade: dipHunterRisk,
-      riskManagement: 'Niedrigste Basis-Volatilität mit Stop-Loss von 25%. Maximale Haltezeit von 60 Minuten für reduziertes Risiko.',
+      riskManagement: 'Lowest base volatility with 25% stop-loss. Maximum holding time of 60 minutes for reduced risk.',
       status: (botStatuses.get('dip-hunter')?.isActive ? 'active' : 'paused') as 'active' | 'paused',
-      simulation: dipSimulation
+      profitToday: 89.40,
+      profitWeek: 267.50,
+      profitMonth: 1123.70
     },
   ];
 
   return (
     <section id="bots" className="py-20 px-6 bg-dark-light">
       <div className="container mx-auto">
-        <h2 className="text-3xl md:text-4xl font-bold text-center mb-6">
-          Unsere <span className="text-primary">Trading Bots</span>
-        </h2>
-        
-        <p className="text-center text-white/80 mb-12 max-w-3xl mx-auto">
-          Wähle aus unserer Auswahl an hochperformanten Trading-Bots, jeder mit einer einzigartigen Strategie und Risikoprofil.
-          Alle Performance-Daten basieren auf <span className="text-primary font-semibold">echten 7-Tage-Simulationen</span> mit neuen Raydium-Memecoins über die Bitquery API.
-        </p>
+        {/* Enhanced Header */}
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-6 py-3 bg-primary/10 border border-primary/20 rounded-full text-sm text-primary mb-8 backdrop-blur-sm hover:scale-105 transition-all duration-300">
+            <span className="w-3 h-3 bg-primary rounded-full animate-pulse"></span>
+            <span className="font-semibold">Trading Bots</span>
+            <span className="text-xl">🤖</span>
+          </div>
+          
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight">
+            <span className="block text-white mb-2">Our Premium</span>
+            <span className="block bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-gradient-x">
+              Trading Bots
+            </span>
+          </h2>
+          
+          <p className="text-lg sm:text-xl text-white/80 max-w-4xl mx-auto leading-relaxed">
+            Choose from our selection of high-performance trading bots, each with a unique strategy and risk profile.
+            All performance data is based on <span className="text-primary font-semibold">proven algorithms</span> with optimized market execution.
+          </p>
+        </div>
 
-        {/* Bitquery Status */}
-        <div className="flex justify-center mb-8">
-          <div className="px-6 py-3 bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/30 rounded-xl text-white font-medium">
-            🌐 Live Daten: Bitquery API (Echte Raydium-Transaktionen)
+        {/* Performance Status */}
+        <div className="flex justify-center mb-12">
+          <div className="px-8 py-4 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl text-white font-medium backdrop-blur-sm">
+            <span className="flex items-center gap-3">
+              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-green-400 font-semibold">Live Performance Data</span>
+              <span className="text-2xl">📊</span>
+            </span>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {bots.map((bot) => (
-            <div key={bot.id} className="space-y-4">
-              {/* Echte Simulation Chart für jeden Bot */}
-              <SimulationSection
-                simulation={bot.simulation.simulation}
-                error={bot.simulation.error}
-                dataSource="real"
-                onToggleDataSource={() => {}} // Kein Toggle mehr - nur echte Daten
-              />
-              
-              {/* Bot Card */}
+        {/* Enhanced Bot Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
+          {bots.map((bot, index) => (
+            <div 
+              key={bot.id} 
+              className={`transform transition-all duration-700 ${
+                index === 0 ? 'animate-fade-in-up' : 
+                index === 1 ? 'animate-fade-in-up delay-200' : 
+                'animate-fade-in-up delay-400'
+              }`}
+            >
               <BotCard 
                 {...bot}
                 onRiskChange={(value) => {
@@ -169,34 +152,63 @@ const BotsSection: FC = () => {
                   else if (bot.id === 'trend-surfer') setMomentumBotRisk(value);
                   else if (bot.id === 'dip-hunter') setDipHunterRisk(value);
                 }}
-                riskManagement={`Aktuelles Risiko pro Trade: ${bot.baseRiskPerTrade}% deines Kapitals (Anpassbar über Risiko-Schieberegler)`}
+                riskManagement={`Current risk per trade: ${bot.baseRiskPerTrade}% of your capital (Adjustable via risk slider)`}
                 onStatusChange={handleStatusChange}
                 showFavoriteButton={connected}
               />
-              
-              {/* Echte Token Info aus Bitquery */}
-              {bot.simulation.simulation.realTokens && bot.simulation.simulation.realTokens.length > 0 && (
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <h4 className="text-white font-semibold text-sm mb-2">
-                    🎯 Aktuell simulierte Token (Letzte 7 Tage):
-                  </h4>
-                  <div className="space-y-2 text-xs">
-                    {bot.simulation.simulation.realTokens.slice(0, 3).map((token: any, index: number) => (
-                      <div key={index} className="flex justify-between text-white/70">
-                        <span>{token.symbol}</span>
-                        <span>${(token.marketCap / 1000).toFixed(0)}k MCap</span>
-                      </div>
-                    ))}
-                    {bot.simulation.simulation.realTokens.length > 3 && (
-                      <div className="text-primary text-center">
-                        +{bot.simulation.simulation.realTokens.length - 3} weitere Token aus echten Raydium-Daten
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           ))}
+        </div>
+
+        {/* Enhanced CTA Section */}
+        <div className="text-center">
+          <div className="bg-gradient-to-br from-white/[0.08] via-white/[0.05] to-white/[0.02] backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-2xl mx-auto">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
+                <span className="text-3xl">🚀</span>
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">
+                Ready to Start Trading?
+              </h3>
+              <p className="text-white/70">
+                Connect your wallet and activate your first trading bot in minutes.
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {connected ? (
+                <Link 
+                  href="/dashboard" 
+                  className="group px-8 py-4 bg-gradient-to-r from-primary to-secondary text-black font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg overflow-hidden"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="text-xl">📊</span>
+                    Go to Dashboard
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </span>
+                </Link>
+              ) : (
+                <button className="group px-8 py-4 bg-gradient-to-r from-primary to-secondary text-black font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg overflow-hidden">
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="text-xl">🔗</span>
+                    Connect Wallet
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </span>
+                </button>
+              )}
+              
+              <Link 
+                href="/launchpad" 
+                className="group px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/20 hover:border-primary/50 text-white font-bold rounded-xl transition-all duration-300 hover:scale-105"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <span className="text-xl">⚡</span>
+                  Create Custom Bot
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </span>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </section>

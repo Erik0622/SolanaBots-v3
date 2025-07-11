@@ -177,14 +177,14 @@ const Hero: FC = () => {
           {/* Enhanced Subtitle */}
           <div className={`transform transition-all duration-1000 delay-800 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
             <p className="text-xl sm:text-2xl lg:text-3xl text-white/80 max-w-5xl mx-auto mb-12 leading-relaxed text-center">
-              Maximiere deine Gewinne mit <span className="relative group">
-                <span className="text-primary font-bold bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">KI-gestützten</span>
+              Maximize your profits with <span className="relative group">
+                <span className="text-primary font-bold bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">AI-powered</span>
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-emerald-400/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></div>
-              </span> Trading-Algorithmen
-              die <span className="relative group">
+              </span> trading algorithms
+              that work <span className="relative group">
                 <span className="text-secondary font-bold bg-gradient-to-r from-secondary to-purple-400 bg-clip-text text-transparent">24/7</span>
                 <div className="absolute -inset-1 bg-gradient-to-r from-secondary/20 to-purple-400/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></div>
-              </span> auf der schnellsten Blockchain arbeiten.
+              </span> on the fastest blockchain.
             </p>
           </div>
           

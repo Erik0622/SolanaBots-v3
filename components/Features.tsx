@@ -253,62 +253,62 @@ const Features: FC = () => {
   const features = [
     {
       title: "Smart Trading Bots",
-      description: "Nutze unsere bewährten Trading-Algorithmen, die Marktdaten in Echtzeit analysieren und profitable Gelegenheiten mit Präzision und Geschwindigkeit identifizieren.",
+      description: "Leverage our proven trading algorithms that analyze market data in real-time and identify profitable opportunities with precision and speed.",
       icon: "🤖",
       gradient: "from-primary to-green-400",
       buttonText: "Explore Bots",
       buttonLink: "#bots",
       features: [
-        "Real-time Marktanalyse",
-        "KI-gestützte Algorithmen",
-        "24/7 automatische Ausführung",
-        "Risikomanagement integriert"
+        "Real-time market analysis",
+        "AI-powered algorithms",
+        "24/7 automated execution",
+        "Integrated risk management"
       ]
     },
     {
       title: "Live Performance Dashboard",
-      description: "Überwache deine Trading-Performance mit Echtzeit-Analytics, Position-Tracking und umfassenden Profit-Visualisierungs-Tools.",
+      description: "Monitor your trading performance with real-time analytics, position tracking, and comprehensive profit visualization tools.",
       icon: "📊",
       gradient: "from-secondary to-purple-400", 
       buttonText: "Go to Dashboard",
       buttonLink: "/dashboard",
       features: [
-        "Echtzeit Portfolio-Tracking",
-        "Detaillierte Performance-Metriken",
-        "Gewinn/Verlust Visualisierung",
-        "Historische Datenanalyse"
+        "Real-time portfolio tracking",
+        "Detailed performance metrics",
+        "Profit/loss visualization",
+        "Historical data analysis"
       ]
     },
     {
       title: "AI-Powered Bot Launchpad",
-      description: "Erstelle deine eigenen Trading-Bots mit unseren KI-unterstützten Tools und verdiene an Transaktionsgebühren, wenn andere deine Strategien nutzen.",
+      description: "Create your own trading bots with our AI-assisted tools and earn transaction fees when others use your strategies.",
       icon: "🚀",
       gradient: "from-orange-400 to-red-400",
       buttonText: "Launch Now",
       buttonLink: "/launchpad",
       features: [
-        "Drag & Drop Bot-Builder",
-        "Strategie-Templates",
-        "Backtesting-Tools",
-        "Revenue-Sharing-Modell"
+        "Drag & drop bot builder",
+        "Strategy templates",
+        "Backtesting tools",
+        "Revenue sharing model"
       ]
     }
   ];
 
   const steps = [
     {
-      title: "Wallet Verbinden",
-      description: "Verbinde dein Solana Wallet sicher mit unserer Plattform durch One-Click-Integration.",
+      title: "Connect Wallet",
+      description: "Securely connect your Solana wallet to our platform through one-click integration.",
       icon: "🔗"
     },
     {
-      title: "Bot Auswählen",
-      description: "Wähle aus unseren bewährten Trading-Bot-Strategien oder erstelle deine eigene maßgeschneiderte Lösung.",
+      title: "Choose Bot",
+      description: "Select from our proven trading bot strategies or create your own custom solution.",
       icon: "🤖"
     },
     {
-      title: "Gewinne Erzielen",
-      description: "Überwache deine Performance und sammle deine Erträge automatisch ein.",
+      title: "Earn Profits",
+      description: "Monitor your performance and automatically collect your returns.",
       icon: "💰"
     }
   ];
@@ -334,15 +334,15 @@ const Features: FC = () => {
           </div>
           
           <h2 className="text-5xl sm:text-6xl lg:text-7xl font-black mb-6 leading-tight">
-            <span className="block text-white mb-2">Alles was du brauchst</span>
+            <span className="block text-white mb-2">Everything you need</span>
             <span className="block bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-gradient-x">
-              für Erfolg
+              for Success
             </span>
           </h2>
           
           <p className="text-xl sm:text-2xl text-white/80 max-w-4xl mx-auto leading-relaxed">
-            Unsere Plattform bietet fortschrittliche Trading-Tools, die entwickelt wurden, um deine Gewinne zu maximieren 
-            und gleichzeitig das Risiko durch modernste Technologie zu minimieren.
+            Our platform provides advanced trading tools designed to maximize your profits 
+            while minimizing risk through cutting-edge technology.
           </p>
         </div>
         
@@ -363,19 +363,19 @@ const Features: FC = () => {
         }`}>
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-secondary/10 border border-secondary/20 rounded-full text-sm text-secondary mb-8 backdrop-blur-sm hover:scale-105 transition-all duration-300">
             <span className="w-3 h-3 bg-secondary rounded-full animate-pulse"></span>
-            <span className="font-semibold">So funktioniert's</span>
+            <span className="font-semibold">How It Works</span>
             <span className="text-xl">🔄</span>
           </div>
           
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight">
-            <span className="block text-white mb-2">Einfach</span>
+            <span className="block text-white mb-2">Simple</span>
             <span className="block bg-gradient-to-r from-secondary via-primary to-secondary bg-clip-text text-transparent animate-gradient-x">
-              & Effektiv
+              & Effective
             </span>
           </h2>
           
           <p className="text-lg sm:text-xl text-white/80 max-w-3xl mx-auto leading-relaxed">
-            Starte in nur drei einfachen Schritten mit dem automatisierten Trading und maximiere deine Gewinne.
+            Start automated trading in just three simple steps and maximize your profits.
           </p>
         </div>
         

@@ -135,28 +135,28 @@ const FAQ: FC = () => {
 
   const faqItems = [
     {
-      question: "Wie funktionieren die Trading Bots?",
-      answer: "Unsere Trading-Bots verwenden fortschrittliche Algorithmen zur Echtzeitanalyse von Marktdaten. Sie identifizieren potenzielle Trading-Gelegenheiten basierend auf Volumentrends, Preisbewegungen und Marktmustern. Wenn eine profitable Gelegenheit erkannt wird, führt der Bot automatisch Trades entsprechend deinen Risikoparametern aus."
+      question: "How do the trading bots work?",
+      answer: "Our trading bots use advanced algorithms for real-time analysis of market data. They identify potential trading opportunities based on volume trends, price movements, and market patterns. When a profitable opportunity is detected, the bot automatically executes trades according to your risk parameters."
     },
     {
-      question: "Welche Gebühren fallen für SolBotQuants an?",
-      answer: "SolBotQuants erhebt eine Gebühr von 1% pro Transaktion. Es gibt keine Abonnementgebühren oder Vorabkosten - wir berechnen nur Gebühren, wenn Trades ausgeführt werden. Dies hält unsere Gebührenstruktur transparent und fair."
+      question: "What fees does SolBotQuants charge?",
+      answer: "SolBotQuants charges a fee of 1% per transaction. There are no subscription fees or upfront costs - we only charge fees when trades are executed. This keeps our fee structure transparent and fair."
     },
     {
-      question: "Ist meine Kryptowährung bei SolBotQuants sicher?",
-      answer: "Ja, absolut. SolBotQuants übernimmt niemals das Sorgerecht für deine Gelder. Alle Operationen werden über sichere Solana Smart Contracts durchgeführt, wobei Transaktionen deine ausdrückliche Genehmigung über dein verbundenes Wallet erfordern. Deine Assets bleiben jederzeit unter deiner Kontrolle."
+      question: "Is my cryptocurrency safe with SolBotQuants?",
+      answer: "Yes, absolutely. SolBotQuants never takes custody of your funds. All operations are conducted through secure Solana smart contracts, with transactions requiring your explicit approval through your connected wallet. Your assets remain under your control at all times."
     },
     {
-      question: "Welche Renditen kann ich erwarten?",
-      answer: "Obwohl vergangene Performance keine Garantie für zukünftige Ergebnisse ist, haben unsere Bots historisch jährliche Renditen zwischen 300-800% generiert, abhängig von den Marktbedingungen und der spezifischen Bot-Strategie. Das Dashboard bietet transparente Performance-Metriken für alle Bot-Strategien."
+      question: "What returns can I expect?",
+      answer: "While past performance is no guarantee of future results, our bots have historically generated annual returns between 300-800%, depending on market conditions and the specific bot strategy. The dashboard provides transparent performance metrics for all bot strategies."
     },
     {
-      question: "Kann ich meinen eigenen Trading Bot erstellen?",
-      answer: "Ja! Unser Launchpad-Feature ermöglicht es dir, benutzerdefinierte Trading-Bots mit unseren KI-unterstützten Tools zu erstellen. Du kannst deine eigenen Strategien definieren und diese sogar für andere Benutzer veröffentlichen. Wenn andere deine Bot-Strategie nutzen, verdienst du einen Anteil an den Transaktionsgebühren."
+      question: "Can I create my own trading bot?",
+      answer: "Yes! Our Launchpad feature allows you to create custom trading bots with our AI-assisted tools. You can define your own strategies and even publish them for other users. When others use your bot strategy, you earn a share of the transaction fees."
     },
     {
-      question: "Welche Kryptowährungen handeln eure Bots?",
-      answer: "Token auf der Solana-Blockchain. Unsere Bots sind darauf ausgelegt, verschiedene SPL-Token im Solana-Ökosystem zu handeln, wobei der Fokus auf Token mit ausreichender Liquidität und Handelsvolumen liegt, um optimale Performance zu gewährleisten."
+      question: "Which cryptocurrencies do your bots trade?",
+      answer: "Tokens on the Solana blockchain. Our bots are designed to trade various SPL tokens in the Solana ecosystem, focusing on tokens with sufficient liquidity and trading volume to ensure optimal performance."
     }
   ];
 
@@ -174,19 +174,19 @@ const FAQ: FC = () => {
         }`}>
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-primary/10 border border-primary/20 rounded-full text-sm text-primary mb-8 backdrop-blur-sm hover:scale-105 transition-all duration-300">
             <span className="w-3 h-3 bg-primary rounded-full animate-pulse"></span>
-            <span className="font-semibold">Häufig gestellte Fragen</span>
+            <span className="font-semibold">Frequently Asked Questions</span>
             <span className="text-xl">❓</span>
           </div>
           
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight">
-            <span className="block text-white mb-2">Alles was du</span>
+            <span className="block text-white mb-2">Everything you</span>
             <span className="block bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-gradient-x">
-              wissen musst
+              need to know
             </span>
           </h2>
           
           <p className="text-lg sm:text-xl text-white/80 max-w-3xl mx-auto leading-relaxed">
-            Finde Antworten auf die wichtigsten Fragen über SolBotQuants und unsere automatisierten Trading-Lösungen.
+            Find answers to the most important questions about SolBotQuants and our automated trading solutions.
           </p>
         </div>
         
@@ -213,10 +213,10 @@ const FAQ: FC = () => {
                 <span className="text-3xl">💬</span>
               </div>
               <h3 className="text-2xl font-bold text-white mb-2">
-                Weitere Fragen?
+                More Questions?
               </h3>
               <p className="text-white/70">
-                Unser Support-Team steht dir jederzeit zur Verfügung.
+                Our support team is always available to help you.
               </p>
             </div>
             
@@ -227,7 +227,7 @@ const FAQ: FC = () => {
               >
                 <span className="flex items-center justify-center gap-2">
                   <span className="text-xl">📧</span>
-                  E-Mail Support
+                  Email Support
                   <span className="group-hover:translate-x-1 transition-transform">→</span>
                 </span>
               </a>

@@ -62,7 +62,7 @@ const Footer: FC = () => {
             </div>
             
             <p className="text-white/70 mb-6 leading-relaxed">
-              Intelligente Trading-Bots für die Solana-Blockchain mit bewährter Rentabilität und modernem Risikomanagement.
+              Intelligent trading bots for the Solana blockchain with proven profitability and modern risk management.
             </p>
             
             {/* Social Links */}
@@ -205,14 +205,14 @@ const Footer: FC = () => {
                 Stay Updated
               </h3>
               <p className="text-white/70">
-                Erhalte die neuesten Updates über neue Features, Trading-Strategien und Performance-Insights.
+                Get the latest updates about new features, trading strategies, and performance insights.
               </p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
               <input 
                 type="email" 
-                placeholder="Deine E-Mail Adresse"
+                placeholder="Your Email Address"
                 className="flex-1 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 hover:border-white/40 focus:border-primary/50 rounded-xl text-white placeholder-white/50 transition-all duration-300 focus:outline-none"
               />
               <button className="px-6 py-3 bg-gradient-to-r from-primary to-secondary text-black font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg">
