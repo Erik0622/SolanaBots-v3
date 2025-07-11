@@ -36,12 +36,14 @@ const Hero: FC = () => {
   // Animate particles
   useEffect(() => {
     const animate = () => {
-      setParticles(prev => prev.map(particle => ({
-        ...particle,
-        y: particle.y - particle.speed,
-        opacity: particle.y < 0 ? Math.random() * 0.5 + 0.1 : particle.opacity,
-        y: particle.y < 0 ? window.innerHeight : particle.y
-      })));
+      setParticles(prev => prev.map(particle => {
+        const newY = particle.y - particle.speed;
+        return {
+          ...particle,
+          y: newY < 0 ? window.innerHeight : newY,
+          opacity: newY < 0 ? Math.random() * 0.5 + 0.1 : particle.opacity
+        };
+      }));
       requestRef.current = requestAnimationFrame(animate);
     };
     
