@@ -1,296 +1,484 @@
-# 🤖 Solana Trading-Bot Simulation mit echten Marktdaten
+# 🤖 RL Trading System v1.0
 
-Eine realistische Trading-Bot-Simulation für Solana Memecoins mit **echten Marktdaten**, **5-Minuten-Charts** und **authentischen Trading-Strategien**.
+**KI-gesteuertes Trading mit Reinforcement Learning**
 
-## 🚀 Neue Features: Bitquery Integration
+Ein vollständiges Reinforcement Learning System für automatisiertes Trading auf 1-Minuten-Charts mit Multi-Objektiv Reward-Funktion, die sowohl Profit als auch Trade-Frequenz optimiert.
 
-### ✨ Was ist neu?
-- **🔥 Echte neue Memecoins** - Token die in den letzten 24h nach Raydium migriert sind
-- **📊 5-Minuten-OHLCV-Daten** - Echte Volatilität und Volume-Spikes  
-- **⏰ Präzise Zeitfilter** - Min. 25min nach Launch, max. 24h alt
-- **💰 Market Cap Filter** - Mindestens 50k Market Cap
-- **🎯 Bot-spezifische Token-Auswahl** - Jeder Bot bekommt die für ihn optimalen Token
+## 🎯 Features
 
-### 🔄 Migration von Pump.fun → Raydium
-```typescript
-// Echte Filter für neue Memecoins:
-✅ Nach Raydium migriert (nicht mehr auf Bonding Curve)
-✅ Nicht älter als 24 Stunden  
-✅ Mindestens 50k Market Cap
-✅ Mindestens 25 Minuten nach Raydium-Launch (Filter für frühe Chaos-Phase)
-✅ 5-Minuten-Candlestick-Daten verfügbar
+### ✨ Kernfunktionen
+- **Multi-Objektiv Optimization**: Profit + Trade-Frequenz + Sharpe Ratio + Drawdown Management
+- **15 Technische Indikatoren**: Vollständig konfigurierbar und erweiterbar
+- **Mehrere RL-Algorithmen**: PPO, DQN, A2C, SAC
+- **Live SL/TP Management**: Automatische Stop-Loss und Take-Profit Ausführung
+- **Multi-Asset Support**: Crypto (Binance), Stocks (Yahoo/Alpaca), Forex
+- **Hyperparameter-Optimierung**: Automatisch mit Optuna
+- **Real-time Backtesting**: Vollständige Simulation mit Transaktionskosten
+
+### 📊 Unterstützte Märkte
+- **Crypto**: Binance API (kostenlos, 24/7 verfügbar)
+- **Stocks**: Yahoo Finance + Alpaca Paper Trading (kostenlos)
+- **Forex**: Über verschiedene APIs erweiterbar
+
+### 🧠 RL-Algorithmen
+- **PPO (Proximal Policy Optimization)**: Empfohlen für Trading
+- **DQN (Deep Q-Network)**: Für diskrete Aktionen
+- **A2C (Advantage Actor-Critic)**: Schnelles Training
+- **SAC (Soft Actor-Critic)**: Für kontinuierliche Aktionen
+
+## 📋 Systemanforderungen
+
+### Software
+- **Python**: 3.8+
+- **RAM**: Mindestens 8GB (16GB empfohlen)
+- **CPU**: Multicore empfohlen für Hyperparameter-Optimierung
+- **GPU**: Optional (für größere Netzwerke)
+
+### APIs (alle kostenlos)
+- **Binance**: Keine API-Keys für historische Daten nötig
+- **Yahoo Finance**: Kostenlos für Aktien
+- **Alpaca**: Kostenlose Paper-Trading API
+- **News API**: Optional für Nachrichtendaten
+
+## 🚀 Installation
+
+### 1. Repository klonen
+```bash
+git clone <repository-url>
+cd rl-trading-system
 ```
 
-## 🎯 Bot-Strategien mit echten Daten
+### 2. Python Environment
+```bash
+# Conda (empfohlen)
+conda create -n trading-rl python=3.9
+conda activate trading-rl
 
-### 1. **Volume-Tracker Bot** 🔊
-- **Strategie**: Kauft bei 3x Volume-Spikes, verkauft bei Normalisierung
-- **Filter**: Bevorzugt Token mit hohem 24h-Volume (>20k$)
-- **Exits**: -10% Stop-Loss, +20% Take-Profit, 8h Timeout
-- **5min-Logik**: Prüft alle 5 Minuten auf Volume-Anomalien
+# Oder virtualenv
+python -m venv trading-rl
+source trading-rl/bin/activate  # Linux/Mac
+trading-rl\Scripts\activate     # Windows
+```
 
-### 2. **Trend-Surfer Bot** 🏄‍♂️  
-- **Strategie**: Folgt 1h-Trends, verkauft bei Trendwechsel
-- **Filter**: Bevorzugt moderate Volatilität (20-80%), stabilere MCaps
-- **Exits**: -8% Stop-Loss, +15% Take-Profit, 12h Timeout
-- **5min-Logik**: Berechnet stündliche Momentum-Indikatoren
+### 3. Dependencies installieren
+```bash
+pip install -r requirements.txt
+```
 
-### 3. **Dip-Hunter Bot** 📉
-- **Strategie**: Kauft bei -15% Dips mit hohem Volume
-- **Filter**: Bevorzugt volatile Token <200k MCap, sucht aktive Dips
-- **Exits**: -6% Stop-Loss, +8% Take-Profit, 16h Timeout  
-- **5min-Logik**: Erkennt 30min-Dips mit Volume-Bestätigung
+### 4. Optional: API Keys konfigurieren
+```bash
+# .env Datei erstellen
+touch .env
 
-## 🔧 Setup & Installation
+# API Keys hinzufügen (optional)
+echo "ALPACA_API_KEY=your_key_here" >> .env
+echo "ALPACA_SECRET_KEY=your_secret_here" >> .env
+echo "NEWS_API_KEY=your_news_key_here" >> .env
+```
 
-### 1. API-Keys einrichten
+## 📚 Schnellstart
+
+### 1. System testen
+```bash
+# Alle Komponenten testen
+python main.py test --symbol BTCUSDT --data-source binance
+
+# Einzelne Komponenten
+python main.py test --component data --symbol AAPL --data-source yahoo
+python main.py test --component indicators
+python main.py test --component environment
+```
+
+### 2. Erstes Training starten
+```bash
+# Einfaches Training (5k Timesteps für schnellen Test)
+python main.py train --symbols BTCUSDT --timesteps 5000
+
+# Vollständiges Training
+python main.py train --symbols BTCUSDT --timesteps 100000 --algorithm PPO
+```
+
+### 3. Hyperparameter optimieren
+```bash
+# Automatische Optimierung (20 Trials)
+python main.py optimize --symbol BTCUSDT --trials 20 --timeout 3600
+```
+
+### 4. Backtest durchführen
+```bash
+# Modell backtesten
+python main.py backtest --model models/best_BTCUSDT_PPO.zip --symbol BTCUSDT --episodes 10
+```
+
+## 🔧 Detaillierte Nutzung
+
+### Training-Modi
+
+#### Einzelsymbol Training
+```bash
+python main.py train \
+    --symbols BTCUSDT \
+    --algorithm PPO \
+    --timesteps 100000 \
+    --data-source binance
+```
+
+#### Multi-Symbol Training
+```bash
+python main.py train \
+    --symbols BTCUSDT ETHUSDT ADAUSDT \
+    --algorithm PPO \
+    --timesteps 50000 \
+    --multiprocessing
+```
+
+#### Algorithmen-Vergleich
+```bash
+# PPO Training
+python main.py train --symbols BTCUSDT --algorithm PPO --timesteps 50000
+
+# DQN Training
+python main.py train --symbols BTCUSDT --algorithm DQN --timesteps 50000
+
+# A2C Training
+python main.py train --symbols BTCUSDT --algorithm A2C --timesteps 50000
+```
+
+### Hyperparameter-Optimierung
 
 ```bash
-# .env.local erstellen
-cp env.example .env.local
+# Vollständige Optimierung
+python main.py optimize \
+    --symbol BTCUSDT \
+    --algorithm PPO \
+    --trials 50 \
+    --timeout 7200
+
+# Schnelle Optimierung
+python main.py optimize \
+    --symbol BTCUSDT \
+    --trials 10 \
+    --timeout 1800
 ```
 
-**Bitquery API (EMPFOHLEN):**
-```bash
-# Registrierung: https://bitquery.io/
-# Kostenlos: 10k Punkte/Monat, 10 req/min
-BITQUERY_API_KEY=your_bitquery_api_key_here
-```
-
-**Alternative APIs:**
-```bash
-# Birdeye API (Backup)
-BIRDEYE_API_KEY=your_birdeye_api_key_here
-
-# Helius API (Optional)  
-HELIUS_API_KEY=your_helius_api_key_here
-```
-
-### 2. Starten
+### Backtesting
 
 ```bash
-npm install
-npm run dev
+# Basis Backtest
+python main.py backtest \
+    --model models/best_BTCUSDT_PPO.zip \
+    --symbol BTCUSDT \
+    --episodes 20
+
+# Verschiedene Märkte
+python main.py backtest \
+    --model models/best_AAPL_PPO.zip \
+    --symbol AAPL \
+    --data-source yahoo \
+    --episodes 10
 ```
 
-### 3. Verwenden
+### Live Trading (Simulation)
 
-1. **Bot-Karte öffnen** in der UI
-2. **"Real API Data"** aktivieren  
-3. **Bitquery-Modus** ist standardmäßig aktiviert
-4. **Ergebnisse vergleichen** - echte vs. simulierte Daten
+```bash
+# Dry Run (empfohlen für Tests)
+python main.py live \
+    --model models/best_BTCUSDT_PPO.zip \
+    --symbol BTCUSDT \
+    --dry-run \
+    --duration 120
 
-## 📊 Datenqualität & Realismus
+# Echtes Trading (Vorsicht!)
+python main.py live \
+    --model models/best_BTCUSDT_PPO.zip \
+    --symbol BTCUSDT \
+    --duration 60
+```
 
-### Bitquery API (NEU - Empfohlen):
-- ✅ **Echte 5-Minuten-OHLCV** von Solana DEXs
-- ✅ **Raydium Migration-Tracking**  
-- ✅ **Präzise Zeitfilter** (25min bis 24h)
-- ✅ **Volume-Spikes** und Liquiditäts-Events
-- ✅ **Bot-spezifische Token-Selektion**
-- ✅ **Pump.fun → Raydium Timeline**
+## ⚙️ Konfiguration
 
-### Legacy APIs (Birdeye/DexScreener):
-- ⚠️ Teilweise tägliche Daten
-- ⚠️ Begrenzte Memecoin-Coverage
-- ⚠️ Weniger granulare Volume-Daten
+### Trading Parameter anpassen
 
-### Simulierte Daten:
-- ⚠️ Mathematische Modelle
-- ⚠️ Künstliche Volatilitätsmuster
-- ⚠️ Hypothetische Szenarien
-
-## 🔍 Echte Trading-Simulation
-
-### Beispiel: Volume-Tracker Bot
-
-```typescript
-// Echter 5-Minuten-Candlestick aus Bitquery
-const candle = {
-  timestamp: 1703123400000, // 21.12.2023 10:30
-  open: 0.000024,
-  high: 0.000031,           // +29% Spike!
-  low: 0.000023,
-  close: 0.000028,
-  volume: 89543             // 3.2x Volume-Increase
+Erstelle `config/custom_config.json`:
+```json
+{
+  "trading": {
+    "initial_balance": 10000.0,
+    "max_position_size": 0.3,
+    "min_position_size": 0.05,
+    "transaction_cost": 0.001,
+    "max_drawdown": 0.15,
+    "target_trades_per_day": 10,
+    "profit_weight": 1.0,
+    "trade_frequency_weight": 0.2,
+    "sharpe_weight": 0.1,
+    "drawdown_penalty": -0.5
+  },
+  "model": {
+    "total_timesteps": 100000,
+    "learning_rate": 0.0003,
+    "batch_size": 64
+  }
 }
+```
 
-// Bot-Logik: Volume-Spike erkannt
-if (candle.volume > previousCandle.volume * 3) {
-  // 🟢 KAUFE bei Volume-Spike
-  position = { entry: 0.000028, time: timestamp }
+Konfiguration nutzen:
+```bash
+python main.py train --config config/custom_config.json --symbols BTCUSDT
+```
+
+### Eigene Indikatoren hinzufügen
+
+Erstelle `indicators/my_indicators.json`:
+```json
+{
+  "indicator_1": {
+    "name": "custom_rsi",
+    "period": 14,
+    "parameters": {...}
+  },
+  "indicator_2": {
+    "name": "custom_macd",
+    "fast": 12,
+    "slow": 26,
+    "signal": 9
+  },
+  ...
 }
-
-// Nächste Candles: Exit-Prüfung
-const currentPrice = 0.000025; // -10.7%
-if (priceChange <= -0.10) {
-  // 🔴 VERKAUFE bei Stop-Loss
-  trade = { profit: -10.7%, duration: '35min' }
-}
 ```
 
-### Performance-Berechnung:
-
-```typescript
-// Echte Token-Performance über 7 Tage
-const tokens = [
-  { symbol: 'NEWMEME', profit: +23.4% },  // Erfolgreicher Trend
-  { symbol: 'RUGTOKEN', profit: -8.1% },  // Stop-Loss getriggert  
-  { symbol: 'MOONSHOT', profit: +67.8% }, // Volume-Spike gehandelt
-];
-
-// Bot-Performance: 
-// Durchschnitt: +27.7%
-// Win-Rate: 66.7% (2/3)
-// Trades: 47 über 7 Tage
-```
-
-## 🚨 API-Limits & Kosten
-
-### Bitquery (Empfohlen):
-- **Kostenlos**: 10k Punkte/Monat  
-- **Rate Limit**: 10 Requests/Minute
-- **Punkt-Kosten**: ~1-5 Punkte pro Query
-- **Reichweite**: ~2000-10000 API-Calls/Monat
-
-### Fallback-Strategie:
-```typescript
-// 1. Bitquery API (beste Daten)
-// 2. Birdeye API (gute Daten)  
-// 3. DexScreener API (basic Daten)
-// 4. Lokale Simulation (künstlich)
-```
-
-## 🎮 UI & UX
-
-### Bot-Karten zeigen:
-- **📈 Performance-Chart** - 7-Tage-Verlauf mit echten Marktdaten
-- **🎯 Trading-Metriken** - Win-Rate, Anzahl Trades, Durchschnittsprofit
-- **🪙 Token-Liste** - Verwendete Memecoins mit Symbolen und Volume
-- **🔴 Live-Indikator** - "Bitquery API", "Legacy API", oder "Simulated"
-- **🔄 Refresh-Button** - Lädt neue Token-Auswahl
-
-### Vergleichsmodus:
-```
-┌─ Volume-Tracker Bot ────────────┐
-│ 🔴 Bitquery API                │
-│ +34.7% │ 23 Trades │ 73% Win   │
-│ NEWMEME, FASTCAT, SOLRISE...   │
-└────────────────────────────────┘
-
-┌─ Volume-Tracker Bot ────────────┐  
-│ 🚀 Simulated Data              │
-│ +28.3% │ 19 Trades │ 68% Win   │
-│ MOCKTOKEN1, TESTCOIN, DEMO...  │
-└────────────────────────────────┘
-```
-
-## 🔬 Entwicklung & Testing
-
-### Lokale Entwicklung:
+Nutzen:
 ```bash
-# Mit Bitquery API
-BITQUERY_API_KEY=your_key npm run dev
-
-# Ohne API (Fallback-Modus)  
-npm run dev
+python main.py train --indicators indicators/my_indicators.json --symbols BTCUSDT
 ```
 
-### Testing:
+## 📊 Monitoring & Analyse
+
+### TensorBoard
 ```bash
-# API-Verbindung testen
-curl -X POST http://localhost:3000/api/simulation \
-  -H "Content-Type: application/json" \
-  -d '{"botType":"volume-tracker","useBitquery":true}'
+# TensorBoard starten
+tensorboard --logdir logs/
+
+# Im Browser öffnen
+http://localhost:6006
 ```
 
-### Debug-Logs:
-```typescript
-// Console-Output bei Bitquery-Simulation:
-🚀 Starting BITQUERY simulation for bot: volume-tracker
-🔍 Searching for new Raydium memecoin migrations...
-✅ Found 23 qualifying memecoins for simulation  
-🎯 Selected 10 tokens for volume-tracker strategy
-📊 Simulation Results: +34.72% profit, 23 trades, 73.9% success rate
-```
-
-## 📈 Roadmap
-
-### Phase 1: ✅ Grundlegende Integration
-- [x] Bitquery API-Integration
-- [x] 5-Minuten-Candlestick-Daten
-- [x] Raydium-Migration-Filter  
-- [x] Bot-spezifische Token-Selektion
-
-### Phase 2: 🚧 Erweiterte Features
-- [ ] Real-Time WebSocket-Updates
-- [ ] Multi-DEX-Support (Jupiter, Orca)
-- [ ] Portfolio-Tracking über mehrere Tage
-- [ ] Rug-Pull-Detection mit ML
-
-### Phase 3: 🔮 Advanced Analytics  
-- [ ] Backtest-Engine für historische Daten
-- [ ] Risk-Management mit Position-Sizing
-- [ ] Social-Sentiment-Integration (Twitter, Telegram)
-- [ ] Copy-Trading und Bot-Abonnements
-
-## ⚡ Performance-Optimierungen
-
-### Caching-Strategien:
-```typescript
-// Token-Discovery: 5min Cache
-// Price-History: 1min Cache  
-// Bot-Simulation: 30sec Cache
-// API-Fallbacks: Automatisch
-```
-
-### Rate-Limit-Management:
-```typescript
-// Intelligente Request-Verteilung:
-// 10 req/min = 1 req alle 6 Sekunden
-// Burst-Protection mit exponential backoff
-// Fallback-APIs bei Überschreitung
-```
-
-## 🐛 Troubleshooting
-
-### Häufige Probleme:
-
-**"Bitquery API Verbindung fehlgeschlagen":**
+### Logs analysieren
 ```bash
-# 1. API-Key prüfen
-echo $BITQUERY_API_KEY
+# Training Logs
+tail -f trading_system.log
 
-# 2. Rate-Limit prüfen (max 10/min)
-# 3. Fallback zu Legacy-APIs aktiviert
+# Specific Symbol Logs
+grep "BTCUSDT" trading_system.log
+
+# Error Logs
+grep "ERROR" trading_system.log
 ```
 
-**"Keine neuen Memecoins gefunden":**
+### Ergebnisse auswerten
 ```bash
-# Normal in ruhigen Marktphasen
-# Fallback zu simulierten Daten
-# Filter sind sehr streng (25min-24h, 50k MCap)
+# Training Results
+cat results/final_results_*.json
+
+# Model Performance
+python -c "
+import json
+with open('results/final_results_20241201_120000.json') as f:
+    results = json.load(f)
+    for symbol, result in results.items():
+        if 'final_mean_reward' in result:
+            print(f'{symbol}: {result[\"final_mean_reward\"]:.4f}')
+"
 ```
 
-**"Simulation dauert zu lange":**
+## 🏗️ Architektur
+
+### Projektstruktur
+```
+rl-trading-system/
+├── config/                  # Konfigurationsdateien
+│   └── config.py           # Hauptkonfiguration
+├── data/                   # Datenmodule
+│   └── data_provider.py    # Multi-API Datenprovider
+├── indicators/             # Technische Indikatoren
+│   └── technical_indicators.py
+├── environment/            # RL Environment
+│   └── trading_env.py      # Gymnasium Trading Environment
+├── training/               # Training Module
+│   └── rl_trainer.py       # Stable-Baselines3 Trainer
+├── models/                 # Gespeicherte Modelle
+├── logs/                   # Training Logs & TensorBoard
+├── results/                # Training Ergebnisse
+├── main.py                 # CLI Interface
+├── requirements.txt        # Dependencies
+└── README.md              # Diese Datei
+```
+
+### Datenfluss
+1. **Data Provider** → Historische & Realtime Daten
+2. **Technical Indicators** → 15 Indikatoren berechnen & normalisieren
+3. **Trading Environment** → Gymnasium Environment mit SL/TP
+4. **RL Trainer** → Stable-Baselines3 Training mit Callbacks
+5. **Backtest/Live** → Modell evaluieren & Trading ausführen
+
+### Action Space
+```python
+# Kontinuierlicher Action Space [4D]
+action = [
+    action_type,    # 0.0-2.0 (Hold/Buy/Sell)
+    amount,         # 0.05-1.0 (5%-100% Position Size)
+    sl_percent,     # 0.01-0.05 (1%-5% Stop Loss)
+    tp_percent      # 0.01-0.10 (1%-10% Take Profit)
+]
+```
+
+### Observation Space
+```python
+# Flattened Feature Vector
+observations = [
+    lookback_window * num_indicators  # 60 * 15 = 900 Features
+]
+```
+
+### Reward Function
+```python
+# Multi-Objektiv Reward
+total_reward = (
+    profit_return * profit_weight +           # Hauptziel: Profit
+    trade_frequency_factor * frequency_weight + # Sekundär: Trade-Frequenz
+    sharpe_ratio * sharpe_weight +              # Tertiär: Risk-adjusted Return
+    max_drawdown * drawdown_penalty             # Strafe: Große Drawdowns
+)
+```
+
+## 🎯 Best Practices
+
+### Training
+1. **Starte klein**: Beginne mit 5k-10k Timesteps für Tests
+2. **Symbol-spezifisch**: Jedes Asset braucht eigenes Training
+3. **Hyperparameter**: Optimiere zuerst, dann finale Training
+4. **Monitoring**: Nutze TensorBoard für Live-Monitoring
+5. **Evaluation**: Führe ausführliche Backtests durch
+
+### Backtesting
+1. **Multiple Episoden**: Mindestens 10-20 Episoden
+2. **Out-of-Sample**: Teste auf neuen, ungesehenen Daten
+3. **Verschiedene Marktbedingungen**: Bull/Bear/Sideways Markets
+4. **Transaction Costs**: Realistische Kosten einbeziehen
+5. **Risk Metrics**: Sharpe Ratio, Max Drawdown, Win Rate
+
+### Live Trading
+1. **Paper Trading zuerst**: Immer mit --dry-run beginnen
+2. **Klein anfangen**: Kleine Position Sizes
+3. **Monitoring**: Kontinuierliche Überwachung
+4. **Stop-Loss**: Immer aktive Risk Management
+5. **Regelmäßige Retraining**: Modelle verfallen über Zeit
+
+## 🔍 Troubleshooting
+
+### Häufige Probleme
+
+#### Keine Daten verfügbar
 ```bash
-# Reduziere tokenCount von 10 auf 5
-# Prüfe Internet-Verbindung
-# Bitquery API kann 2-5 Sekunden dauern
+# Problem: API Limits oder Network Issues
+# Lösung: Datenquelle wechseln
+python main.py test --data-source yahoo --symbol AAPL
+python main.py test --data-source binance --symbol BTCUSDT
 ```
 
-## 📝 Fazit
+#### Training stürzt ab
+```bash
+# Problem: Memory Issues
+# Lösung: Kleinere Batch Size oder weniger Environments
+python main.py train --symbols BTCUSDT --timesteps 10000
+```
 
-Die **Bitquery-Integration** macht die Trading-Bot-Simulation **deutlich realistischer**:
+#### Schlechte Performance
+```bash
+# Problem: Suboptimale Hyperparameter
+# Lösung: Hyperparameter-Optimierung
+python main.py optimize --symbol BTCUSDT --trials 30
+```
 
-- ✅ **Echte neue Memecoins** statt vordefinierter Token-Listen
-- ✅ **5-Minuten-Granularität** für präzise Entry/Exit-Punkte  
-- ✅ **Dynamische Token-Discovery** basierend auf echten Raydium-Migrationen
-- ✅ **Bot-spezifische Optimierung** für Volume, Trends und Dips
+#### Environment Errors
+```bash
+# Problem: Observation/Action Space Mismatch
+# Lösung: Environment testen
+python main.py test --component environment --symbol BTCUSDT
+```
 
-**Für Demo-Zwecke**: Simulierte Daten  
-**Für ernsthafte Analyse**: Bitquery API mit echten Memecoin-Daten
+### Debug Modi
+```bash
+# Verbose Logging
+python main.py train --log-level DEBUG --symbols BTCUSDT --timesteps 1000
+
+# Step-by-Step Testing
+python main.py test --component data
+python main.py test --component indicators  
+python main.py test --component environment
+```
+
+## 📈 Performance Optimization
+
+### Training beschleunigen
+```bash
+# Multiprocessing (nur Crypto)
+python main.py train --symbols BTCUSDT --multiprocessing --timesteps 100000
+
+# GPU Unterstützung (PyTorch)
+# Automatisch erkannt wenn CUDA verfügbar
+
+# Kleinere Lookback Window
+# In config.py: LOOKBACK_WINDOW = 30 (statt 60)
+```
+
+### Memory optimieren
+```bash
+# Weniger Symbole parallel
+python main.py train --symbols BTCUSDT  # statt mehrere
+
+# Kleinere Batch Sizes
+# In config.py: BATCH_SIZE = 32 (statt 64)
+```
+
+## 🔮 Roadmap
+
+### v1.1 (nächste Version)
+- [ ] Live Trading Implementation
+- [ ] Forex Factory News Integration
+- [ ] Portfolio Mode (Multi-Asset gleichzeitig)
+- [ ] Advanced Risk Management
+- [ ] Web Dashboard
+
+### v1.2 (zukünftig)
+- [ ] LSTM/Transformer Features
+- [ ] Ensemble Models
+- [ ] Advanced Order Types
+- [ ] Options/Futures Support
+- [ ] Cloud Deployment
+
+## 🤝 Beitragen
+
+1. Fork das Repository
+2. Feature Branch erstellen (`git checkout -b feature/amazing-feature`)
+3. Changes committen (`git commit -m 'Add amazing feature'`)
+4. Push zum Branch (`git push origin feature/amazing-feature`)
+5. Pull Request öffnen
+
+## 📝 Lizenz
+
+Dieses Projekt steht unter der MIT Lizenz. Siehe `LICENSE` Datei für Details.
+
+## ⚠️ Disclaimer
+
+**RISIKOHINWEIS**: Dieses System ist zu Bildungs- und Forschungszwecken erstellt. Trading von Finanzinstrumenten birgt erhebliche Risiken. Verwenden Sie dieses System NIEMALS mit echtem Geld ohne vorherige ausführliche Tests und eigenes Verständnis der Risiken. Der Autor übernimmt keine Verantwortung für finanzielle Verluste.
+
+## 🆘 Support
+
+- **Issues**: GitHub Issues für Bugs und Feature Requests
+- **Diskussionen**: GitHub Discussions für Fragen
+- **Wiki**: Detaillierte Dokumentation im GitHub Wiki
 
 ---
 
-🚀 **Ready to trade with real data?** Hol dir deinen [Bitquery API-Key](https://bitquery.io/) und erlebe echte Memecoin-Volatilität! 
+**Happy Trading! 🚀📈** 
