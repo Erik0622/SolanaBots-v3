@@ -53,11 +53,11 @@ const BotsSection: FC = () => {
       trades: 247,
       winRate: '73%',
       strategy: 'Buys at specific volume-to-market-cap thresholds in freshly listed tokens (under 24h). Sells with staged profit-taking at 70% and full exit at 140% profit, with stop-loss at 35%.',
-      riskLevel: 'moderate' as const,
+      riskLevel: 'medium' as const,
       riskColor: 'text-yellow-400',
       baseRiskPerTrade: volumeTrackerRisk,
       riskManagement: 'Automatic stop-loss mechanisms with 35% loss limitation. Risk per trade adjustable from 1-50% of capital.',
-      status: (botStatuses.get('volume-tracker')?.isActive ? 'active' : 'paused') as 'active' | 'paused',
+      status: (botStatuses.get('volume-tracker')?.isActive ? 'active' : 'inactive') as 'active' | 'inactive',
       profitToday: 142.50,
       profitWeek: 356.80,
       profitMonth: 1847.30
@@ -75,7 +75,7 @@ const BotsSection: FC = () => {
       riskColor: 'text-red-400',
       baseRiskPerTrade: momentumBotRisk,
       riskManagement: 'Higher base volatility with stop-loss at 35%. Risk per trade adjustable from 1-50% of capital.',
-      status: (botStatuses.get('trend-surfer')?.isActive ? 'active' : 'paused') as 'active' | 'paused',
+      status: (botStatuses.get('trend-surfer')?.isActive ? 'active' : 'inactive') as 'active' | 'inactive',
       profitToday: 187.90,
       profitWeek: 432.10,
       profitMonth: 2156.80
@@ -93,7 +93,7 @@ const BotsSection: FC = () => {
       riskColor: 'text-green-400',
       baseRiskPerTrade: dipHunterRisk,
       riskManagement: 'Conservative approach with 25% stop-loss and gradual position building. Risk per trade adjustable from 1-50% of capital.',
-      status: (botStatuses.get('dip-hunter')?.isActive ? 'active' : 'paused') as 'active' | 'paused',
+      status: (botStatuses.get('dip-hunter')?.isActive ? 'active' : 'inactive') as 'active' | 'inactive',
       profitToday: 89.20,
       profitWeek: 267.40,
       profitMonth: 1124.70
@@ -154,6 +154,9 @@ const BotsSection: FC = () => {
             >
               <BotCard 
                 {...bot}
+                isActive={bot.status === 'active'}
+                onToggle={() => handleStatusChange(bot.id, bot.status === 'active' ? 'paused' : 'active')}
+                riskPercentage={bot.baseRiskPerTrade}
                 onRiskChange={(value) => {
                   if (bot.id === 'volume-tracker') setVolumeTrackerRisk(value);
                   else if (bot.id === 'trend-surfer') setMomentumBotRisk(value);
@@ -161,7 +164,6 @@ const BotsSection: FC = () => {
                 }}
                 riskManagement={`Current risk per trade: ${bot.baseRiskPerTrade}% of your capital (Adjustable via risk slider)`}
                 onStatusChange={handleStatusChange}
-                showFavoriteButton={connected}
               />
             </div>
           ))}
