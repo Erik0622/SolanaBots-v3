@@ -42,6 +42,7 @@ interface BotCardProps {
   riskPercentage: number;
   onRiskChange: (risk: number) => void;
   riskManagement?: string;
+  onStatusChange?: (id: string, status: 'active' | 'paused') => void;
 }
 
 // Mock performance data generator
@@ -172,7 +173,8 @@ const BotCard: FC<BotCardProps> = ({
   onToggle,
   riskPercentage,
   onRiskChange,
-  riskManagement
+  riskManagement,
+  onStatusChange
 }) => {
   const { isBotFavorite, toggleFavorite } = useFavoriteBots();
   const [isExpanded, setIsExpanded] = useState(false);
