@@ -203,90 +203,88 @@ const MobileNavigation: FC = () => {
       </div>
 
       {/* Mobile Menu Overlay */}
-      {isOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[100] pointer-events-auto">
-          {/* Mobile Menu */}
-          <div 
-            ref={menuRef}
-            className="fixed top-0 right-0 h-full w-80 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 border-l border-gray-700 transform transition-transform duration-300 ease-in-out z-[101]"
-            style={{ transform: isOpen ? 'translateX(0)' : 'translateX(100%)' }}
-          >
-            {/* Menu Header */}
-            <div className="p-6 border-b border-gray-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {/* <Logo size="lg" /> */}
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Menu</h2>
-                    <p className="text-sm text-gray-400">Navigation</p>
-                  </div>
+      <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[100] pointer-events-auto">
+        {/* Mobile Menu */}
+        <div 
+          ref={menuRef}
+          className="fixed top-0 right-0 h-full w-80 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 border-l border-gray-700 transform transition-transform duration-300 ease-in-out z-[101]"
+          style={{ transform: isOpen ? 'translateX(0)' : 'translateX(100%)' }}
+        >
+          {/* Menu Header */}
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {/* <Logo size="lg" /> */}
+                <div>
+                  <h2 className="text-xl font-bold text-white">Menu</h2>
+                  <p className="text-sm text-gray-400">Navigation</p>
                 </div>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700"
-                >
-                  <X className="w-5 h-5" />
-                </button>
               </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
+          </div>
 
-            {/* Navigation Items */}
-            <nav className="p-4">
-              <ul className="space-y-3">
-                {navigationItems.map((item) => {
-                  const IconComponent = item.icon;
-                  const active = isActive(item.href);
-                  
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setIsOpen(false)}
-                        className={`group flex items-center px-4 py-4 rounded-xl text-base font-medium transition-all duration-200 touch-manipulation ${
-                          active
-                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg transform scale-105'
-                            : 'text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-105'
-                        }`}
-                      >
-                        <IconComponent className={`w-6 h-6 mr-4 ${
-                          active ? 'text-white' : 'text-gray-400 group-hover:text-white'
-                        }`} />
-                        <span>{item.label}</span>
-                        
-                        {active && (
-                          <div className="ml-auto">
-                            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                          </div>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
+          {/* Navigation Items */}
+          <nav className="p-4">
+            <ul className="space-y-3">
+              {navigationItems.map((item) => {
+                const IconComponent = item.icon;
+                const active = isActive(item.href);
+                
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setIsOpen(false)}
+                      className={`group flex items-center px-4 py-4 rounded-xl text-base font-medium transition-all duration-200 touch-manipulation ${
+                        active
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg transform scale-105'
+                          : 'text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-105'
+                      }`}
+                    >
+                      <IconComponent className={`w-6 h-6 mr-4 ${
+                        active ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                      }`} />
+                      <span>{item.label}</span>
+                      
+                      {active && (
+                        <div className="ml-auto">
+                          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                        </div>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
 
-            {/* Wallet Section */}
-            <div className="absolute bottom-6 left-4 right-4">
-              <div className="p-4 bg-gray-800 rounded-xl border border-gray-700">
-                <div className="flex items-center space-x-3 mb-4">
-                  {connected ? (
-                    <Wifi className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <WifiOff className="w-5 h-5 text-red-400" />
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      {connected ? 'Connected' : 'Disconnected'}
-                    </p>
-                    <p className="text-xs text-gray-400">Solana Network</p>
-                  </div>
+          {/* Wallet Section */}
+          <div className="absolute bottom-6 left-4 right-4">
+            <div className="p-4 bg-gray-800 rounded-xl border border-gray-700">
+              <div className="flex items-center space-x-3 mb-4">
+                {connected ? (
+                  <Wifi className="w-5 h-5 text-green-400" />
+                ) : (
+                  <WifiOff className="w-5 h-5 text-red-400" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-white">
+                    {connected ? 'Connected' : 'Disconnected'}
+                  </p>
+                  <p className="text-xs text-gray-400">Solana Network</p>
                 </div>
-                <WalletMultiButton className="!w-full !bg-gradient-to-r !from-blue-600 !to-purple-600 !border-0 !rounded-lg !text-white hover:!opacity-90" />
               </div>
+              <WalletMultiButton className="!w-full !bg-gradient-to-r !from-blue-600 !to-purple-600 !border-0 !rounded-lg !text-white hover:!opacity-90" />
             </div>
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 };

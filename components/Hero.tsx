@@ -77,17 +77,6 @@ const Hero: FC = () => {
           
           {/* Header */}
           <div className="space-y-6">
-            <div className="flex justify-center items-center space-x-4 mb-6">
-              <div className={`p-4 rounded-2xl bg-gradient-to-r ${currentBotData.color} transform transition-all duration-500 ${
-                isAnimating ? 'scale-110 rotate-12' : 'scale-100 rotate-0'
-              }`}>
-                <IconComponent className="w-8 h-8 text-white" />
-              </div>
-              <div className="h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent flex-1 max-w-xs"></div>
-              <Activity className="w-6 h-6 text-green-400 animate-pulse" />
-              <div className="h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent flex-1 max-w-xs"></div>
-            </div>
-
             <h1 className="text-5xl md:text-7xl font-black text-white leading-tight">
               <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent animate-gradient">
                 Solana Trading
