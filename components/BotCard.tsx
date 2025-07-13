@@ -41,6 +41,7 @@ interface BotCardProps {
   onToggle: (id: string) => void;
   riskPercentage: number;
   onRiskChange: (risk: number) => void;
+  riskManagement?: string;
 }
 
 // Mock performance data generator
@@ -170,7 +171,8 @@ const BotCard: FC<BotCardProps> = ({
   isActive,
   onToggle,
   riskPercentage,
-  onRiskChange
+  onRiskChange,
+  riskManagement
 }) => {
   const { isBotFavorite, toggleFavorite } = useFavoriteBots();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -455,8 +457,15 @@ const BotCard: FC<BotCardProps> = ({
                 <p className="text-sm text-white">Just now</p>
               </div>
             </div>
+
+            {riskManagement && (
+              <div className="mt-2">
+                <span className="text-xs text-gray-400">Risk Details</span>
+                <p className="text-sm text-white">{riskManagement}</p>
+              </div>
+            )}
             
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-3">
               <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-lg text-xs border border-blue-500/30">
                 AI-Powered
               </span>
