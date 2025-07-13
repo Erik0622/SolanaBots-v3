@@ -177,9 +177,9 @@ const MobileNavigation: FC = () => {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-gray-900 border-b border-gray-700 z-50">
         <div className="flex items-center justify-between p-4">
-          {/* Logo */}
+          {/* Logo entfernt */}
           <div className="flex items-center space-x-3">
-            <Logo size="md" />
+            {/* <Logo size="md" /> */}
             <div>
               <h1 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 Trading Bots
@@ -187,7 +187,7 @@ const MobileNavigation: FC = () => {
             </div>
           </div>
 
-          {/* Menu Button - Fixed the click handler */}
+          {/* Menu Button */}
           <button
             onClick={toggleMenu}
             className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700 transition-colors touch-manipulation"
@@ -204,18 +204,18 @@ const MobileNavigation: FC = () => {
 
       {/* Mobile Menu Overlay */}
       {isOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40">
+        <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[100] pointer-events-auto">
           {/* Mobile Menu */}
           <div 
             ref={menuRef}
-            className="fixed top-0 right-0 h-full w-80 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 border-l border-gray-700 transform transition-transform duration-300 ease-in-out"
+            className="fixed top-0 right-0 h-full w-80 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 border-l border-gray-700 transform transition-transform duration-300 ease-in-out z-[101]"
             style={{ transform: isOpen ? 'translateX(0)' : 'translateX(100%)' }}
           >
             {/* Menu Header */}
             <div className="p-6 border-b border-gray-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <Logo size="lg" />
+                  {/* <Logo size="lg" /> */}
                   <div>
                     <h2 className="text-xl font-bold text-white">Menu</h2>
                     <p className="text-sm text-gray-400">Navigation</p>
