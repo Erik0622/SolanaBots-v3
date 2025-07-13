@@ -10,6 +10,7 @@ import { useFavoriteBots } from '@/hooks/useFavoriteBots';
 import { predefinedBots } from '@/config/bots';
 import { Star, Rocket } from 'lucide-react';
 import Link from 'next/link';
+import { getBotStatus, setBotStatus, getBotRisk, saveBotRisk } from '@/lib/botState';
 
 const MyBotsPage = () => {
   const wallet = useWallet();
@@ -17,6 +18,15 @@ const MyBotsPage = () => {
   const { favoriteBots } = useFavoriteBots();
   const [activeTab, setActiveTab] = useState<'created' | 'favorites'>('created');
   const [isClient, setIsClient] = useState(false);
+  
+  const handleToggleBot = (botId: string) => {
+    const currentStatus = getBotStatus(botId);
+    setBotStatus(botId, !currentStatus);
+  };
+  
+  const handleRiskChange = (botId: string, risk: number) => {
+    saveBotRisk(botId, risk);
+  };
 
   // Stelle sicher, dass wir auf dem Client sind
   useEffect(() => {
@@ -116,7 +126,11 @@ const MyBotsPage = () => {
                     <BotCard
                       key={bot.id}
                       {...bot}
-                      showFavoriteButton={false}
+                      status={'active'}
+                      isActive={true}
+                      onToggle={() => {}}
+                      riskPercentage={25}
+                      onRiskChange={() => {}}
                     />
                   ))}
                 </div>
@@ -146,7 +160,11 @@ const MyBotsPage = () => {
                     <BotCard
                       key={bot.id}
                       {...bot}
-                      showFavoriteButton={true}
+                      status={'active'}
+                      isActive={true}
+                      onToggle={handleToggleBot}
+                      riskPercentage={25}
+                      onRiskChange={(risk) => handleRiskChange(bot.id, risk)}
                     />
                   ))}
                 </div>
