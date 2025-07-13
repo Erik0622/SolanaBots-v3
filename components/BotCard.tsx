@@ -172,12 +172,10 @@ const BotCard: FC<BotCardProps> = ({
   riskPercentage,
   onRiskChange
 }) => {
-  const { isFavorite, toggleFavorite } = useFavoriteBots();
+  const { isBotFavorite, toggleFavorite } = useFavoriteBots();
   const [isExpanded, setIsExpanded] = useState(false);
   const [localRisk, setLocalRisk] = useState(riskPercentage);
   const [isSimulating, setIsSimulating] = useState(false);
-  const { startSimulation, stopSimulation, getSimulationStatus } = useSimulation();
-  
   // Generate mock chart data based on performance
   const performanceTrend = weeklyReturn.includes('+') ? 'up' : weeklyReturn.includes('-') ? 'down' : 'neutral';
   const chartData = generateMockChartData(performanceTrend);
@@ -188,11 +186,6 @@ const BotCard: FC<BotCardProps> = ({
     setLocalRisk(riskPercentage);
   }, [riskPercentage]);
 
-  useEffect(() => {
-    const simStatus = getSimulationStatus(id);
-    setIsSimulating(simStatus.isRunning);
-  }, [id, getSimulationStatus]);
-
   const handleRiskChange = (newRisk: number) => {
     setLocalRisk(newRisk);
     onRiskChange(newRisk);
@@ -200,17 +193,8 @@ const BotCard: FC<BotCardProps> = ({
   };
 
   const handleSimulation = async () => {
-    if (isSimulating) {
-      stopSimulation(id);
-      setIsSimulating(false);
-    } else {
-      setIsSimulating(true);
-      await startSimulation(id, {
-        symbol: 'BTCUSDT',
-        duration: 24,
-        risk: localRisk / 100
-      });
-    }
+    setIsSimulating(!isSimulating);
+    // Simulation logic would go here
   };
 
   const getRiskColor = (risk: string) => {
@@ -278,12 +262,12 @@ const BotCard: FC<BotCardProps> = ({
             <button
               onClick={() => toggleFavorite(id)}
               className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
-                isFavorite(id)
+                isBotFavorite(id)
                   ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                   : 'bg-gray-700/50 text-gray-400 border border-gray-600/50 hover:border-gray-500'
               }`}
             >
-              <Star className={`w-4 h-4 ${isFavorite(id) ? 'fill-current' : ''}`} />
+              <Star className={`w-4 h-4 ${isBotFavorite(id) ? 'fill-current' : ''}`} />
             </button>
             
             <Link href={`/bot/${id}`}>
