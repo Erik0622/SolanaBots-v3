@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useState, useEffect, useRef } from 'react';
+import React, { FC, useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Link from 'next/link';
@@ -18,7 +18,6 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
-import ReactDOM from 'react-dom';
 
 const DesktopSidebar: FC = () => {
   const pathname = usePathname();
@@ -128,33 +127,10 @@ const DesktopSidebar: FC = () => {
   );
 };
 
-const SimpleMobileMenu: FC<{ isOpen: boolean; onClose: () => void; navigationItems: any[] }> = ({ isOpen, onClose, navigationItems }) => {
-  if (typeof window === 'undefined') return null;
-  return ReactDOM.createPortal(
-    isOpen ? (
-      <div className="fixed inset-0 z-[200]">
-        <div className="absolute inset-0 bg-black bg-opacity-60" onClick={onClose}></div>
-        <div className="absolute top-0 right-0 w-64 h-full bg-gray-900 shadow-2xl p-6 flex flex-col">
-          <button onClick={onClose} className="self-end mb-8 text-white text-2xl">×</button>
-          <nav className="flex-1">
-            <ul className="space-y-6">
-              {navigationItems.map((item) => (
-                <li key={item.href}>
-                  <Link href={item.href} className="text-white text-lg" onClick={onClose}>{item.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-      </div>
-    ) : null,
-    document.body
-  );
-};
-
-const MobileNavigation: FC = () => {
+// Komplett neues mobiles Menü
+const MobileMenu: FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
+  
   const navigationItems = [
     { href: '/dashboard', label: 'Dashboard', icon: Gauge },
     { href: '/my-bots', label: 'My Bots', icon: BarChart3 },
@@ -162,19 +138,115 @@ const MobileNavigation: FC = () => {
     { href: '/api-docs', label: 'API Docs', icon: HelpCircle }
   ];
 
-  useEffect(() => { setIsOpen(false); }, [pathname]);
+  const isActive = (path: string) => pathname === path;
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] lg:hidden">
+      {/* Overlay */}
+      <div 
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Menu Panel */}
+      <div className="absolute top-0 right-0 h-full w-80 bg-gray-900 shadow-2xl">
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-700">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              Trading Bots
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 p-6">
+            <ul className="space-y-4">
+              {navigationItems.map((item) => {
+                const IconComponent = item.icon;
+                const active = isActive(item.href);
+                
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onClose}
+                      className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                        active
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                          : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                      }`}
+                    >
+                      <IconComponent className={`w-5 h-5 mr-3 ${
+                        active ? 'text-white' : 'text-gray-400'
+                      }`} />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          {/* Status Indicator */}
+          <div className="p-6 border-t border-gray-700">
+            <div className="flex items-center space-x-2 p-3 bg-gray-800 rounded-lg border border-gray-700">
+              <Wifi className="w-4 h-4 text-green-400" />
+              <div>
+                <p className="text-xs font-medium text-green-400">Connected</p>
+                <p className="text-xs text-gray-500">Solana Mainnet</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MobileNavigation: FC = () => {
+  const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Menü schließen bei Seiten-Wechsel
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
+
+  // Menü schließen bei Escape-Taste
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isMenuOpen]);
 
   return (
     <>
+      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-gray-900 border-b border-gray-700 z-50">
         <div className="flex items-center justify-between p-4">
-          <div>
+          <div className="flex items-center space-x-3">
+            <Logo size="md" />
             <h1 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
               Trading Bots
             </h1>
           </div>
           <button
-            onClick={() => setIsOpen(true)}
+            onClick={() => setIsMenuOpen(true)}
             className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700 transition-colors"
             aria-label="Open menu"
           >
@@ -182,7 +254,9 @@ const MobileNavigation: FC = () => {
           </button>
         </div>
       </div>
-      <SimpleMobileMenu isOpen={isOpen} onClose={() => setIsOpen(false)} navigationItems={navigationItems} />
+
+      {/* Mobile Menu */}
+      <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
     </>
   );
 };

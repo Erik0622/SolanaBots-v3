@@ -3,7 +3,7 @@
 import React, { FC, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { useWallet } from './ClientWalletProvider';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { 
   TrendingUp, 
   Zap, 
@@ -58,7 +58,7 @@ const Hero: FC = () => {
   const IconComponent = currentBotData.icon;
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-24 sm:pt-0">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-32 lg:pt-24">
       
       {/* Dynamic Background Pattern */}
       <div className="absolute inset-0 opacity-20">
@@ -124,22 +124,12 @@ const Hero: FC = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center max-w-lg mx-auto">
-            {/* Mobile: Connect Wallet Button über Explore Bots */}
-            <div className="block sm:hidden w-full mb-2">
+            {/* Connect Wallet Button */}
+            <div className="w-full sm:w-auto">
               <WalletMultiButton className="!w-full !bg-gradient-to-r !from-blue-600 !to-purple-600 !text-white !font-bold !rounded-xl !px-8 !py-4 !transition-all !duration-300 hover:!scale-105 hover:!shadow-lg hover:!shadow-blue-500/25" />
             </div>
-            {/* Desktop: Connect Wallet Button rechts neben Explore Bots */}
-            <div className="hidden sm:block">
-              <WalletMultiButton className="!w-full !bg-gradient-to-r !from-blue-600 !to-purple-600 !text-white !font-bold !rounded-xl !px-8 !py-4 !transition-all !duration-300 hover:!scale-105 hover:!shadow-lg hover:!shadow-blue-500/25" />
-            </div>
-            <Link 
-              href="/dashboard" 
-              className="group w-full sm:w-auto flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
-            >
-              <BarChart3 className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-              Go to Dashboard
-              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            
+            {/* Explore Bots Button */}
             <Link 
               href="#bots" 
               className="group w-full sm:w-auto flex items-center justify-center px-8 py-4 bg-gray-800/80 backdrop-blur-sm border border-gray-600 text-white font-semibold rounded-xl transition-all duration-300 hover:border-gray-500 hover:bg-gray-700/80 hover:scale-105"
