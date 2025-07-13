@@ -1,246 +1,100 @@
 'use client';
 
 import React, { FC, useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-
-const FeatureCard: FC<{
-  title: string;
-  description: string;
-  icon: string;
-  gradient: string;
-  buttonText: string;
-  buttonLink: string;
-  delay: number;
-  features: string[];
-}> = ({ title, description, icon, gradient, buttonText, buttonLink, delay, features }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => setIsVisible(true), delay);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [delay]);
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (cardRef.current) {
-      const rect = cardRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setMousePosition({ x, y });
-    }
-  };
-
-  return (
-    <div
-      ref={cardRef}
-      className={`group relative overflow-hidden transition-all duration-700 ${
-        isVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-8'
-      }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onMouseMove={handleMouseMove}
-      style={{
-        transform: isHovered 
-          ? `rotateX(${-(mousePosition.y - 200) / 30}deg) rotateY(${(mousePosition.x - 200) / 30}deg) translateZ(20px)`
-          : 'rotateX(0deg) rotateY(0deg) translateZ(0px)',
-        transformStyle: 'preserve-3d',
-        perspective: '1000px'
-      }}
-    >
-      {/* Enhanced Background with Glassmorphism */}
-      <div className="relative bg-gradient-to-br from-white/[0.12] via-white/[0.08] to-white/[0.04] backdrop-blur-xl border border-white/20 rounded-3xl transition-all duration-500 group-hover:border-white/40 group-hover:bg-white/[0.15] h-full">
-        
-        {/* Dynamic Background Pattern */}
-        <div className="absolute inset-0 opacity-20">
-          <div 
-            className="absolute inset-0"
-            style={{
-              background: `radial-gradient(circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(20, 241, 149, 0.15) 0%, transparent 50%)`,
-              transition: 'background 0.3s ease',
-            }}
-          ></div>
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
-            backgroundSize: '30px 30px',
-          }}></div>
-        </div>
-        
-        {/* Gradient Glow */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-2xl`}></div>
-        
-        {/* Content */}
-        <div className="relative p-8 h-full flex flex-col">
-          {/* Enhanced Icon */}
-          <div className={`mb-6 relative transition-all duration-500 ${isHovered ? 'scale-110 rotate-6' : ''}`}>
-            <div className={`w-20 h-20 bg-gradient-to-br ${gradient} rounded-3xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transition-all duration-500 backdrop-blur-sm border border-white/10`}>
-              <span className="text-4xl filter drop-shadow-lg">{icon}</span>
-            </div>
-            
-            {/* Floating particles */}
-            {isHovered && (
-              <>
-                <div className="absolute -top-2 -right-2 w-3 h-3 bg-primary rounded-full animate-ping opacity-75"></div>
-                <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-secondary rounded-full animate-bounce delay-200"></div>
-                <div className="absolute top-1/2 -right-3 w-1 h-1 bg-yellow-400 rounded-full animate-pulse delay-300"></div>
-              </>
-            )}
-            
-            {/* Glow ring */}
-            <div className={`absolute inset-0 rounded-3xl border-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${gradient.includes('primary') ? 'border-primary/30' : gradient.includes('secondary') ? 'border-secondary/30' : 'border-orange-400/30'} animate-pulse`}></div>
-          </div>
-          
-          {/* Enhanced Title */}
-          <h3 className="text-2xl font-black mb-4 bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent group-hover:from-white group-hover:to-primary transition-all duration-300">
-            {title}
-          </h3>
-          
-          {/* Enhanced Description */}
-          <p className="text-white/70 text-base leading-relaxed mb-6 flex-grow">
-            {description}
-          </p>
-          
-          {/* Feature List */}
-          <div className="mb-6">
-            <ul className="space-y-2">
-              {features.map((feature, index) => (
-                <li key={index} className="flex items-center gap-3 text-sm text-white/60 group-hover:text-white/80 transition-colors duration-300">
-                  <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${gradient} flex-shrink-0`}></div>
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {/* Enhanced Button */}
-          <Link
-            href={buttonLink}
-            className={`group/btn relative px-6 py-3 bg-gradient-to-r ${gradient} text-black font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg overflow-hidden text-center`}
-          >
-            <span className="relative z-10 flex items-center justify-center gap-2">
-              {buttonText}
-              <span className="group-hover/btn:translate-x-1 transition-transform duration-300">→</span>
-            </span>
-            
-            {/* Shine effect */}
-            <div className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12"></div>
-          </Link>
-        </div>
-      </div>
-      
-      {/* Enhanced Shadow */}
-      <div className={`absolute -inset-2 bg-gradient-to-r ${gradient} rounded-3xl blur-xl opacity-0 group-hover:opacity-30 transition-opacity duration-500 -z-10`}></div>
-    </div>
-  );
-};
-
-const ProcessStep: FC<{
-  number: number;
-  title: string;
-  description: string;
-  delay: number;
-  icon: string;
-}> = ({ number, title, description, delay, icon }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const stepRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => setIsVisible(true), delay);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (stepRef.current) {
-      observer.observe(stepRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [delay]);
-
-  return (
-    <div
-      ref={stepRef}
-      className={`group relative text-center transition-all duration-700 ${
-        isVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-8'
-      }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Enhanced Number Circle */}
-      <div className="relative mx-auto mb-6">
-        <div className="w-24 h-24 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center shadow-xl group-hover:shadow-2xl group-hover:shadow-primary/50 transition-all duration-500 group-hover:scale-110 backdrop-blur-sm border border-white/10">
-          <span className="text-3xl font-black text-black">{number}</span>
-        </div>
-        
-        {/* Icon overlay */}
-        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-secondary to-purple-500 rounded-full flex items-center justify-center shadow-lg">
-          <span className="text-sm">{icon}</span>
-        </div>
-        
-        {/* Animated rings */}
-        <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping-slow opacity-75"></div>
-        <div className={`absolute inset-0 rounded-full border-2 border-secondary/30 transition-opacity duration-500 ${isHovered ? 'animate-spin opacity-100' : 'opacity-0'}`}></div>
-        
-        {/* Connecting line (except for last step) */}
-        {number < 3 && (
-          <div className="hidden lg:block absolute top-12 left-full w-full h-1 bg-gradient-to-r from-primary/50 via-secondary/30 to-transparent transform -translate-y-1/2">
-            <div className="h-full bg-gradient-to-r from-primary to-secondary animate-shimmer opacity-60"></div>
-          </div>
-        )}
-      </div>
-      
-      {/* Enhanced Content */}
-      <div className="space-y-3">
-        <h3 className="text-xl font-bold text-white group-hover:text-primary transition-colors duration-300">
-          {title}
-        </h3>
-        <p className="text-white/70 text-sm leading-relaxed max-w-xs mx-auto group-hover:text-white/90 transition-colors duration-300">
-          {description}
-        </p>
-      </div>
-      
-      {/* Hover effects */}
-      {isHovered && (
-        <>
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full animate-ping"></div>
-          <div className="absolute bottom-0 left-1/4 w-0.5 h-0.5 bg-secondary rounded-full animate-bounce delay-200"></div>
-          <div className="absolute bottom-0 right-1/4 w-0.5 h-0.5 bg-yellow-400 rounded-full animate-pulse delay-300"></div>
-        </>
-      )}
-    </div>
-  );
-};
+import {
+  BarChart3,
+  Rocket,
+  DollarSign,
+  Zap,
+  Shield,
+  Activity,
+  TrendingUp,
+  Clock,
+  Target,
+  Brain,
+  Lock,
+  Users
+} from 'lucide-react';
 
 const Features: FC = () => {
-  const [sectionVisible, setSectionVisible] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [isInView, setIsInView] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
+
+  const features = [
+    {
+      title: "AI-Powered Analysis",
+      description: "Advanced machine learning algorithms analyze thousands of market indicators in real-time to identify optimal trading opportunities.",
+      longDescription: "Our proprietary AI engine processes vast amounts of market data, technical indicators, social sentiment, and historical patterns to make split-second trading decisions with unprecedented accuracy.",
+      icon: BarChart3,
+      color: "from-blue-500 to-cyan-500",
+      stats: { value: "98.7%", label: "Accuracy Rate" }
+    },
+    {
+      title: "Lightning-Fast Execution", 
+      description: "Execute trades in milliseconds on Solana's high-performance blockchain, ensuring you never miss profitable opportunities.",
+      longDescription: "Built on Solana's ultra-fast infrastructure, our bots can execute complex trading strategies with sub-50ms latency, giving you a significant edge over traditional trading platforms.",
+      icon: Rocket,
+      color: "from-purple-500 to-pink-500", 
+      stats: { value: "30ms", label: "Avg Execution" }
+    },
+    {
+      title: "Smart Risk Management",
+      description: "Intelligent position sizing, stop-losses, and portfolio diversification protect your capital while maximizing returns.",
+      longDescription: "Our sophisticated risk management system automatically adjusts position sizes based on market volatility, implements dynamic stop-losses, and maintains optimal portfolio allocation across multiple assets.",
+      icon: DollarSign,
+      color: "from-green-500 to-emerald-500",
+      stats: { value: "12.8%", label: "Max Drawdown" }
+    }
+  ];
+
+  const additionalFeatures = [
+    {
+      title: "24/7 Autonomous Trading",
+      description: "Never sleep, never miss an opportunity. Our bots work around the clock.",
+      icon: Clock,
+      color: "text-blue-400"
+    },
+    {
+      title: "Advanced Security",
+      description: "Multi-layer security protocols keep your funds and strategies safe.",
+      icon: Lock,
+      color: "text-green-400"
+    },
+    {
+      title: "Real-time Monitoring",
+      description: "Live dashboards and instant alerts keep you informed of every move.",
+      icon: Activity,
+      color: "text-purple-400"
+    },
+    {
+      title: "Community Insights",
+      description: "Learn from top traders and share strategies with our community.",
+      icon: Users,
+      color: "text-orange-400"
+    },
+    {
+      title: "Backtesting Engine",
+      description: "Test strategies against historical data before deploying capital.",
+      icon: TrendingUp,
+      color: "text-cyan-400"
+    },
+    {
+      title: "Risk Analytics",
+      description: "Comprehensive risk metrics and portfolio analysis tools.",
+      icon: Shield,
+      color: "text-red-400"
+    }
+  ];
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setSectionVisible(true);
+          setIsInView(true);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.2 }
     );
 
     if (sectionRef.current) {
@@ -250,147 +104,182 @@ const Features: FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const features = [
-    {
-      title: "Smart Trading Bots",
-      description: "Leverage our proven trading algorithms that analyze market data in real-time and identify profitable opportunities with precision and speed.",
-      icon: "🤖",
-      gradient: "from-primary to-green-400",
-      buttonText: "Explore Bots",
-      buttonLink: "#bots",
-      features: [
-        "Real-time market analysis",
-        "AI-powered algorithms",
-        "24/7 automated execution",
-        "Integrated risk management"
-      ]
-    },
-    {
-      title: "Live Performance Dashboard",
-      description: "Monitor your trading performance with real-time analytics, position tracking, and comprehensive profit visualization tools.",
-      icon: "📊",
-      gradient: "from-secondary to-purple-400", 
-      buttonText: "Go to Dashboard",
-      buttonLink: "/dashboard",
-      features: [
-        "Real-time portfolio tracking",
-        "Detailed performance metrics",
-        "Profit/loss visualization",
-        "Historical data analysis"
-      ]
-    },
-    {
-      title: "AI-Powered Bot Launchpad",
-      description: "Create your own trading bots with our AI-assisted tools and earn transaction fees when others use your strategies.",
-      icon: "🚀",
-      gradient: "from-orange-400 to-red-400",
-      buttonText: "Launch Now",
-      buttonLink: "/launchpad",
-      features: [
-        "Drag & drop bot builder",
-        "Strategy templates",
-        "Backtesting tools",
-        "Revenue sharing model"
-      ]
-    }
-  ];
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveFeature((prev) => (prev + 1) % features.length);
+    }, 5000);
 
-  const steps = [
-    {
-      title: "Connect Wallet",
-      description: "Securely connect your Solana wallet to our platform through one-click integration.",
-      icon: "🔗"
-    },
-    {
-      title: "Choose Bot",
-      description: "Select from our proven trading bot strategies or create your own custom solution.",
-      icon: "🤖"
-    },
-    {
-      title: "Earn Profits",
-      description: "Monitor your performance and automatically collect your returns.",
-      icon: "💰"
-    }
-  ];
+    return () => clearInterval(interval);
+  }, [features.length]);
+
+  const activeFeatureData = features[activeFeature];
+  const ActiveIcon = activeFeatureData.icon;
 
   return (
-    <section ref={sectionRef} id="features" className="relative py-20 overflow-hidden">
-      {/* Enhanced Background Elements */}
-      <div className="absolute inset-0 bg-gradient-to-b from-dark via-dark-light to-dark"></div>
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-conic from-primary/5 via-secondary/5 to-primary/5 rounded-full blur-3xl animate-spin-slow"></div>
+    <section ref={sectionRef} id="features" className="py-20 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
       
-      {/* Content */}
+      {/* Background Effects */}
+      <div className="absolute inset-0">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
       <div className="container mx-auto px-6 relative z-10">
-        {/* Enhanced Header */}
-        <div className={`text-center mb-20 transition-all duration-1000 ${
-          sectionVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-8'
+        
+        {/* Section Header */}
+        <div className={`text-center mb-16 transform transition-all duration-1000 ${
+          isInView ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
         }`}>
-          <div className="inline-flex items-center gap-2 px-6 py-3 bg-primary/10 border border-primary/20 rounded-full text-sm text-primary mb-8 backdrop-blur-sm hover:scale-105 transition-all duration-300">
-            <span className="w-3 h-3 bg-primary rounded-full animate-pulse"></span>
-            <span className="font-semibold">Powerful Features</span>
-            <span className="text-xl">⚡</span>
+          <div className="flex items-center justify-center space-x-4 mb-6">
+            <div className="h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent flex-1 max-w-xs"></div>
+            <Brain className="w-8 h-8 text-blue-400" />
+            <div className="h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent flex-1 max-w-xs"></div>
           </div>
           
-          <h2 className="text-5xl sm:text-6xl lg:text-7xl font-black mb-6 leading-tight">
-            <span className="block text-white mb-2">Everything you need</span>
-            <span className="block bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-gradient-x">
-              for Success
-            </span>
+          <h2 className="text-4xl md:text-6xl font-black text-white mb-6">
+            Advanced <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Features</span>
           </h2>
           
-          <p className="text-xl sm:text-2xl text-white/80 max-w-4xl mx-auto leading-relaxed">
-            Our platform provides advanced trading tools designed to maximize your profits 
-            while minimizing risk through cutting-edge technology.
+          <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
+            Cutting-edge technology meets intuitive design. Experience the future of automated trading with features designed for both beginners and professionals.
           </p>
         </div>
-        
-        {/* Enhanced Features Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-32">
-          {features.map((feature, index) => (
-            <FeatureCard
-              key={feature.title}
-              {...feature}
-              delay={index * 200}
-            />
-          ))}
-        </div>
-        
-        {/* Enhanced How It Works */}
-        <div className={`text-center mb-16 transition-all duration-1000 delay-600 ${
-          sectionVisible ? 'animate-fade-in-up' : 'opacity-0 translate-y-8'
+
+        {/* Main Feature Showcase */}
+        <div className={`grid lg:grid-cols-2 gap-12 mb-20 items-center transform transition-all duration-1000 delay-200 ${
+          isInView ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
         }`}>
-          <div className="inline-flex items-center gap-2 px-6 py-3 bg-secondary/10 border border-secondary/20 rounded-full text-sm text-secondary mb-8 backdrop-blur-sm hover:scale-105 transition-all duration-300">
-            <span className="w-3 h-3 bg-secondary rounded-full animate-pulse"></span>
-            <span className="font-semibold">How It Works</span>
-            <span className="text-xl">🔄</span>
+          
+          {/* Feature Content */}
+          <div className="space-y-8">
+            <div className="flex items-center space-x-4">
+              <div className={`p-4 rounded-2xl bg-gradient-to-r ${activeFeatureData.color}`}>
+                <ActiveIcon className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold text-white">{activeFeatureData.title}</h3>
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-2xl font-bold text-blue-400">{activeFeatureData.stats.value}</span>
+                  <span className="text-gray-400">{activeFeatureData.stats.label}</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-lg text-gray-300 leading-relaxed">
+              {activeFeatureData.longDescription}
+            </p>
+
+            {/* Feature Navigation */}
+            <div className="flex space-x-4">
+              {features.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setActiveFeature(index)}
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    index === activeFeature 
+                      ? 'bg-blue-400 scale-125' 
+                      : 'bg-gray-600 hover:bg-gray-500'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
-          
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight">
-            <span className="block text-white mb-2">Simple</span>
-            <span className="block bg-gradient-to-r from-secondary via-primary to-secondary bg-clip-text text-transparent animate-gradient-x">
-              & Effective
-            </span>
-          </h2>
-          
-          <p className="text-lg sm:text-xl text-white/80 max-w-3xl mx-auto leading-relaxed">
-            Start automated trading in just three simple steps and maximize your profits.
-          </p>
+
+          {/* Feature Visualization */}
+          <div className="relative">
+            <div className="bg-gray-800/40 backdrop-blur-lg border border-gray-700/50 rounded-2xl p-8 hover:border-gray-600/50 transition-all duration-300">
+              <div className="text-center space-y-6">
+                <div className={`p-6 rounded-2xl bg-gradient-to-r ${activeFeatureData.color} mx-auto w-24 h-24 flex items-center justify-center transform transition-all duration-500 hover:scale-110`}>
+                  <ActiveIcon className="w-12 h-12 text-white" />
+                </div>
+                
+                <div>
+                  <h4 className="text-2xl font-bold text-white mb-2">{activeFeatureData.title}</h4>
+                  <p className="text-gray-400">{activeFeatureData.description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-800/60 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-green-400">↑ 24.7%</div>
+                    <div className="text-sm text-gray-400">This Month</div>
+                  </div>
+                  <div className="bg-gray-800/60 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-blue-400">1,247</div>
+                    <div className="text-sm text-gray-400">Active Trades</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        
-        {/* Enhanced Process Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-          {steps.map((step, index) => (
-            <ProcessStep
-              key={step.title}
-              number={index + 1}
-              title={step.title}
-              description={step.description}
-              delay={800 + index * 200}
-              icon={step.icon}
-            />
-          ))}
+
+        {/* Additional Features Grid */}
+        <div className={`transform transition-all duration-1000 delay-400 ${
+          isInView ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+        }`}>
+          <div className="text-center mb-12">
+            <h3 className="text-3xl font-bold text-white mb-4">Everything You Need</h3>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              A comprehensive suite of tools and features designed to give you the competitive edge in cryptocurrency trading.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {additionalFeatures.map((feature, index) => {
+              const FeatureIcon = feature.icon;
+              
+              return (
+                <div
+                  key={feature.title}
+                  className={`group bg-gray-800/30 backdrop-blur-sm border border-gray-700/50 rounded-xl p-6 hover:border-gray-600/50 hover:bg-gray-800/50 transition-all duration-300 hover:transform hover:scale-105 ${
+                    isInView ? 'animate-fade-in-up' : 'opacity-0'
+                  }`}
+                  style={{ animationDelay: `${600 + index * 100}ms` }}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      <FeatureIcon className={`w-6 h-6 ${feature.color} group-hover:scale-110 transition-transform duration-300`} />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                        {feature.title}
+                      </h4>
+                      <p className="text-gray-400 text-sm leading-relaxed">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Performance Highlight */}
+        <div className={`mt-20 text-center transform transition-all duration-1000 delay-600 ${
+          isInView ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+        }`}>
+          <div className="bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 border border-blue-500/30 rounded-2xl p-8 max-w-4xl mx-auto">
+            <div className="flex items-center justify-center space-x-3 mb-6">
+              <Target className="w-8 h-8 text-blue-400" />
+              <span className="text-2xl font-bold text-white">Peak Performance</span>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-8">
+              <div>
+                <div className="text-3xl font-black text-green-400 mb-2">+347%</div>
+                <div className="text-gray-300">Best Monthly Return</div>
+              </div>
+              <div>
+                <div className="text-3xl font-black text-blue-400 mb-2">99.9%</div>
+                <div className="text-gray-300">Uptime Guarantee</div>
+              </div>
+              <div>
+                <div className="text-3xl font-black text-purple-400 mb-2">50ms</div>
+                <div className="text-gray-300">Average Execution</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

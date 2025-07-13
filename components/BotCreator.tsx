@@ -6,6 +6,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import BotCard from './BotCard';
 import { useCustomBots } from '@/hooks/useCustomBots';
 import { toast } from 'react-hot-toast';
+import { CheckCircle } from 'lucide-react';
 
 interface BotCreatorProps {}
 

@@ -8,6 +8,8 @@ import Header from '@/components/Header';
 import { useCustomBots } from '@/hooks/useCustomBots';
 import { useFavoriteBots } from '@/hooks/useFavoriteBots';
 import { predefinedBots } from '@/config/bots';
+import { Star, Rocket } from 'lucide-react';
+import Link from 'next/link';
 
 const MyBotsPage = () => {
   const wallet = useWallet();
@@ -92,18 +94,21 @@ const MyBotsPage = () => {
           {activeTab === 'created' && (
             <div>
               {customBots.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="text-6xl mb-4">🤖</div>
-                  <h3 className="text-2xl font-bold mb-4">No Custom Bots Yet</h3>
-                  <p className="text-white/60 mb-8">
-                    Create your first custom bot in the Launchpad to see it here.
-                  </p>
-                  <a
-                    href="/launchpad"
-                    className="inline-block bg-gradient-to-r from-primary to-secondary text-black px-8 py-3 rounded-xl font-bold hover:scale-105 transition-transform"
-                  >
-                    Go to Launchpad
-                  </a>
+                <div className="text-center space-y-6">
+                  <div className="p-8 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl">
+                    <Star className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+                    <h3 className="text-3xl font-bold text-white mb-4">No Bots Created Yet</h3>
+                    <p className="text-gray-300 text-lg mb-6">
+                      Create your first custom trading bot to get started with automated trading on Solana.
+                    </p>
+                    <Link
+                      href="/launchpad"
+                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:scale-105 transition-all duration-200"
+                    >
+                      <Rocket className="w-5 h-5 mr-2" />
+                      Create Your First Bot
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

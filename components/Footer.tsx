@@ -1,247 +1,209 @@
 "use client";
 
-import React, { FC, useState } from 'react';
+import React, { FC } from 'react';
 import Link from 'next/link';
-import Logo from './Logo';
+import { 
+  BarChart3, 
+  Rocket, 
+  Target, 
+  Github, 
+  Twitter, 
+  MessageCircle,
+  Mail,
+  ArrowRight,
+  Zap,
+  Shield,
+  Activity
+} from 'lucide-react';
 
 const Footer: FC = () => {
-  const [hoveredLink, setHoveredLink] = useState<string | null>(null);
-
-  const socialLinks = [
-    { name: 'Twitter/X', href: 'https://x.com/solbotquants?s=21', icon: '🐦', color: 'from-blue-400 to-cyan-500' },
-    { name: 'Telegram', href: '#', icon: '📱', color: 'from-blue-500 to-blue-600' },
-    { name: 'Discord', href: '#', icon: '💬', color: 'from-indigo-500 to-purple-600' },
-    { name: 'GitHub', href: '#', icon: '🐙', color: 'from-gray-700 to-gray-900' },
-  ];
+  const currentYear = new Date().getFullYear();
 
   const quickLinks = [
-    { name: 'API Documentation', href: '/api-docs', icon: '📚' },
-    { name: 'Terms of Service', href: '/terms', icon: '📄' },
-    { name: 'Privacy Policy', href: '/privacy', icon: '🔒' },
-    { name: 'Security', href: '/security', icon: '🛡️' },
+    { name: 'Volume Tracker', href: '/#bots', icon: BarChart3 },
+    { name: 'Momentum Bot', href: '/#bots', icon: Rocket },
+    { name: 'Dip Hunter', href: '/#bots', icon: Target },
   ];
 
-  const botLinks = [
-    { name: 'Volume Tracker', href: '/#bots', icon: '📊' },
-    { name: 'Momentum Bot', href: '/#bots', icon: '🚀' },
-    { name: 'Dip Hunter', href: '/#bots', icon: '💎' },
-    { name: 'Custom Bots', href: '/launchpad', icon: '⚙️' },
+  const resources = [
+    { name: 'Documentation', href: '/api-docs' },
+    { name: 'API Reference', href: '/api-docs' },
+    { name: 'Getting Started', href: '/dashboard' },
+    { name: 'FAQ', href: '/#faq' },
+  ];
+
+  const legal = [
+    { name: 'Privacy Policy', href: '/privacy' },
+    { name: 'Terms of Service', href: '/terms' },
+    { name: 'Risk Disclosure', href: '/risk' },
+    { name: 'Contact', href: '/contact' },
+  ];
+
+  const socialLinks = [
+    { name: 'GitHub', href: '#', icon: Github },
+    { name: 'Twitter', href: '#', icon: Twitter },
+    { name: 'Discord', href: '#', icon: MessageCircle },
   ];
 
   return (
-    <footer className="relative bg-dark px-6 py-16 border-t border-white/10 overflow-hidden">
-      {/* Enhanced Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-dark via-dark-light to-dark"></div>
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
+    <footer className="bg-gradient-to-b from-gray-900 via-gray-800 to-black border-t border-gray-700/50 relative overflow-hidden">
       
-      {/* Grid pattern overlay */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-          backgroundSize: '50px 50px',
-        }}></div>
+      {/* Background Effects */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="container mx-auto relative z-10">
+      <div className="relative z-10">
+        
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          
-          {/* Brand Section */}
-          <div className="lg:col-span-1">
-            <div className="group mb-6">
-              {/* Enhanced Logo */}
-              <div className="flex items-center space-x-3 mb-4">
-                <Logo size="lg" className="group-hover:scale-110 transition-transform duration-300" />
-                <div className="text-2xl font-black">
-                  <span className="text-white">Sol</span>
-                  <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Bot</span>
-                  <span className="text-[#FAD02C]">Quants</span>
+        <div className="container mx-auto px-6 py-16">
+          <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8">
+            
+            {/* Brand Section */}
+            <div className="lg:col-span-1">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500">
+                  <Activity className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    Trading Bots
+                  </h3>
+                  <p className="text-xs text-gray-400">Solana Network</p>
                 </div>
               </div>
-            </div>
-            
-            <p className="text-white/70 mb-6 leading-relaxed">
-              Intelligent trading bots for the Solana blockchain with proven profitability and modern risk management.
-            </p>
-            
-            {/* Social Links */}
-            <div className="space-y-3">
-              <h4 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
-                <span className="w-2 h-2 bg-gradient-to-r from-primary to-secondary rounded-full"></span>
-                Follow us
-              </h4>
-              <div className="flex flex-wrap gap-3">
-                {socialLinks.map((social) => (
-                  <a
-                    key={social.name}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`group relative p-3 bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/30 rounded-xl transition-all duration-300 hover:scale-110`}
-                    onMouseEnter={() => setHoveredLink(social.name)}
-                    onMouseLeave={() => setHoveredLink(null)}
-                  >
-                    <span className="text-xl group-hover:scale-110 transition-transform duration-300">
-                      {social.icon}
-                    </span>
-                    
-                    {/* Hover background */}
-                    <div className={`absolute inset-0 bg-gradient-to-r ${social.color} opacity-0 group-hover:opacity-20 rounded-xl transition-opacity duration-300`}></div>
-                    
-                    {/* Tooltip */}
-                    {hoveredLink === social.name && (
-                      <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg text-white text-xs whitespace-nowrap animate-fade-in-up">
-                        {social.name}
-                      </div>
-                    )}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-          
-          {/* Trading Bots Section */}
-          <div>
-            <h4 className="text-white font-bold text-lg mb-6 flex items-center gap-2">
-              <span className="text-2xl">🤖</span>
-              Trading Bots
-            </h4>
-            <ul className="space-y-3">
-              {botLinks.map((link) => (
-                <li key={link.name}>
-                  <Link 
-                    href={link.href} 
-                    className="group flex items-center gap-3 text-white/70 hover:text-primary transition-all duration-300 hover:translate-x-1"
-                  >
-                    <span className="text-lg group-hover:scale-110 transition-transform duration-300">
-                      {link.icon}
-                    </span>
-                    <span className="group-hover:text-white transition-colors duration-300">
-                      {link.name}
-                    </span>
-                    <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-0 group-hover:translate-x-1">
-                      →
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {/* Quick Links Section */}
-          <div>
-            <h4 className="text-white font-bold text-lg mb-6 flex items-center gap-2">
-              <span className="text-2xl">🔗</span>
-              Quick Links
-            </h4>
-            <ul className="space-y-3">
-              {quickLinks.map((link) => (
-                <li key={link.name}>
-                  <Link 
-                    href={link.href} 
-                    className="group flex items-center gap-3 text-white/70 hover:text-primary transition-all duration-300 hover:translate-x-1"
-                  >
-                    <span className="text-lg group-hover:scale-110 transition-transform duration-300">
-                      {link.icon}
-                    </span>
-                    <span className="group-hover:text-white transition-colors duration-300">
-                      {link.name}
-                    </span>
-                    <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-0 group-hover:translate-x-1">
-                      →
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {/* Contact & Developer Info */}
-          <div>
-            <h4 className="text-white font-bold text-lg mb-6 flex items-center gap-2">
-              <span className="text-2xl">📞</span>
-              Contact
-            </h4>
-            
-            <div className="space-y-4">
-              <a 
-                href="mailto:contact@solbotquants.io" 
-                className="group flex items-center gap-3 text-white/70 hover:text-primary transition-all duration-300 hover:translate-x-1"
-              >
-                <span className="text-lg group-hover:scale-110 transition-transform duration-300">📧</span>
-                <span className="group-hover:text-white transition-colors duration-300">
-                  contact@solbotquants.io
-                </span>
-              </a>
               
-              <div className="pt-4 border-t border-white/10">
-                <p className="text-white/60 text-sm mb-2 font-semibold">Developer Wallet:</p>
-                <div className="group p-3 bg-white/5 backdrop-blur-sm border border-white/10 hover:border-primary/30 rounded-xl transition-all duration-300">
-                  <p className="text-primary text-xs font-mono break-all group-hover:text-white transition-colors duration-300">
-                    81EWHKqwf2bfVfFn71VcLY1VvnxDXsHQAyy85PZLc38D
-                  </p>
-                  <button 
-                    onClick={() => navigator.clipboard.writeText('81EWHKqwf2bfVfFn71VcLY1VvnxDXsHQAyy85PZLc38D')}
-                    className="mt-2 text-xs text-white/60 hover:text-primary transition-colors duration-300 flex items-center gap-1"
-                  >
-                    <span>📋</span>
-                    Copy Address
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Enhanced Newsletter Section */}
-        <div className="mb-16">
-          <div className="bg-gradient-to-br from-white/[0.08] via-white/[0.05] to-white/[0.02] backdrop-blur-xl border border-white/10 rounded-3xl p-8 text-center max-w-2xl mx-auto">
-            <div className="mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-                <span className="text-3xl">📬</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2">
-                Stay Updated
-              </h3>
-              <p className="text-white/70">
-                Get the latest updates about new features, trading strategies, and performance insights.
+              <p className="text-gray-400 leading-relaxed mb-6">
+                Advanced AI-powered trading bots designed for the Solana ecosystem. 
+                Maximize your profits with automated, intelligent trading strategies.
               </p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <input 
-                type="email" 
-                placeholder="Your Email Address"
-                className="flex-1 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 hover:border-white/40 focus:border-primary/50 rounded-xl text-white placeholder-white/50 transition-all duration-300 focus:outline-none"
-              />
-              <button className="px-6 py-3 bg-gradient-to-r from-primary to-secondary text-black font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg">
-                Subscribe
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        {/* Enhanced Bottom Section */}
-        <div className="border-t border-white/10 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="text-center md:text-left">
-              <p className="text-white/60">© {new Date().getFullYear()} SolBotQuants. All rights reserved.</p>
-              <p className="text-white/50 text-sm mt-1">
-                Trading bots involve inherent risks. Past performance is not indicative of future results.
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 backdrop-blur-sm border border-green-500/30 rounded-full">
+
+              <div className="flex items-center space-x-2 mb-4">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-green-400 text-sm font-semibold">
-                  All Systems Operational
-                </span>
+                <span className="text-sm text-green-400 font-medium">System Online</span>
               </div>
+
+              <div className="flex space-x-4">
+                {socialLinks.map((social) => {
+                  const IconComponent = social.icon;
+                  return (
+                    <Link
+                      key={social.name}
+                      href={social.href}
+                      className="p-2 rounded-lg bg-gray-800/50 border border-gray-700/50 text-gray-400 hover:text-white hover:border-gray-600 hover:bg-gray-700/50 transition-all duration-200"
+                    >
+                      <IconComponent className="w-5 h-5" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h4 className="text-lg font-semibold text-white mb-6 flex items-center">
+                <Zap className="w-5 h-5 mr-2 text-blue-400" />
+                Trading Bots
+              </h4>
+              <ul className="space-y-3">
+                {quickLinks.map((link) => {
+                  const IconComponent = link.icon;
+                  return (
+                    <li key={link.name}>
+                      <Link
+                        href={link.href}
+                        className="group flex items-center space-x-2 text-gray-400 hover:text-white transition-colors duration-200"
+                      >
+                        <IconComponent className="w-4 h-4 text-gray-500 group-hover:text-blue-400 transition-colors" />
+                        <span className="group-hover:translate-x-1 transition-transform duration-200">{link.name}</span>
+                        <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h4 className="text-lg font-semibold text-white mb-6 flex items-center">
+                <Shield className="w-5 h-5 mr-2 text-green-400" />
+                Resources
+              </h4>
+              <ul className="space-y-3">
+                {resources.map((resource) => (
+                  <li key={resource.name}>
+                    <Link
+                      href={resource.href}
+                      className="group flex items-center space-x-2 text-gray-400 hover:text-white transition-colors duration-200"
+                    >
+                      <span className="group-hover:translate-x-1 transition-transform duration-200">{resource.name}</span>
+                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Legal & Contact */}
+            <div>
+              <h4 className="text-lg font-semibold text-white mb-6 flex items-center">
+                <Mail className="w-5 h-5 mr-2 text-purple-400" />
+                Legal & Support
+              </h4>
+              <ul className="space-y-3">
+                {legal.map((item) => (
+                  <li key={item.name}>
+                    <Link
+                      href={item.href}
+                      className="group flex items-center space-x-2 text-gray-400 hover:text-white transition-colors duration-200"
+                    >
+                      <span className="group-hover:translate-x-1 transition-transform duration-200">{item.name}</span>
+                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Performance Stats */}
+              <div className="mt-8 p-4 bg-gray-800/30 border border-gray-700/50 rounded-xl">
+                <div className="text-sm text-gray-400 mb-2">24h Performance</div>
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="w-4 h-4 text-green-400" />
+                  <span className="text-green-400 font-semibold">+12.4%</span>
+                  <span className="text-gray-500">avg return</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="border-t border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+          <div className="container mx-auto px-6 py-6">
+            <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
               
-              <div className="text-white/50 text-sm">
-                Built with ❤️ on Solana
+              <div className="text-center md:text-left">
+                <p className="text-gray-400 text-sm">
+                  © {currentYear} Solana Trading Bots. All rights reserved.
+                </p>
+                <p className="text-gray-500 text-xs mt-1">
+                  Built on Solana • Powered by AI • Secured by smart contracts
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2 text-sm">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-green-400">All systems operational</span>
+                </div>
+                
+                <div className="h-4 w-px bg-gray-600"></div>
+                
+                <div className="text-sm text-gray-400">
+                  <span>99.9% uptime</span>
+                </div>
               </div>
             </div>
           </div>
