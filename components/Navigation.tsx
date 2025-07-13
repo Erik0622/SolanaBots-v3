@@ -18,6 +18,7 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
+import ReactDOM from 'react-dom';
 
 const DesktopSidebar: FC = () => {
   const pathname = usePathname();
@@ -127,14 +128,33 @@ const DesktopSidebar: FC = () => {
   );
 };
 
+const SimpleMobileMenu: FC<{ isOpen: boolean; onClose: () => void; navigationItems: any[] }> = ({ isOpen, onClose, navigationItems }) => {
+  if (typeof window === 'undefined') return null;
+  return ReactDOM.createPortal(
+    isOpen ? (
+      <div className="fixed inset-0 z-[200]">
+        <div className="absolute inset-0 bg-black bg-opacity-60" onClick={onClose}></div>
+        <div className="absolute top-0 right-0 w-64 h-full bg-gray-900 shadow-2xl p-6 flex flex-col">
+          <button onClick={onClose} className="self-end mb-8 text-white text-2xl">×</button>
+          <nav className="flex-1">
+            <ul className="space-y-6">
+              {navigationItems.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} className="text-white text-lg" onClick={onClose}>{item.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </div>
+    ) : null,
+    document.body
+  );
+};
+
 const MobileNavigation: FC = () => {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const { connected } = useWallet();
-  const menuRef = useRef<HTMLDivElement>(null);
-  
-  const isActive = (path: string) => pathname === path;
-
   const navigationItems = [
     { href: '/dashboard', label: 'Dashboard', icon: Gauge },
     { href: '/my-bots', label: 'My Bots', icon: BarChart3 },
@@ -142,149 +162,27 @@ const MobileNavigation: FC = () => {
     { href: '/api-docs', label: 'API Docs', icon: HelpCircle }
   ];
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.body.style.overflow = 'hidden'; // Prevent scroll
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
-
-  // Close menu on route change
-  useEffect(() => {
-    setIsOpen(false);
-  }, [pathname]);
-
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
-  };
+  useEffect(() => { setIsOpen(false); }, [pathname]);
 
   return (
     <>
-      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-gray-900 border-b border-gray-700 z-50">
         <div className="flex items-center justify-between p-4">
-          {/* Logo entfernt */}
-          <div className="flex items-center space-x-3">
-            {/* <Logo size="md" /> */}
-            <div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                Trading Bots
-              </h1>
-            </div>
+          <div>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              Trading Bots
+            </h1>
           </div>
-
-          {/* Menu Button */}
           <button
-            onClick={toggleMenu}
-            className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700 transition-colors touch-manipulation"
-            aria-label="Toggle menu"
+            onClick={() => setIsOpen(true)}
+            className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700 transition-colors"
+            aria-label="Open menu"
           >
-            {isOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+            <Menu className="w-6 h-6" />
           </button>
         </div>
       </div>
-
-      {/* Mobile Menu Overlay */}
-      <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[100] pointer-events-auto">
-        {/* Mobile Menu */}
-        <div 
-          ref={menuRef}
-          className="fixed top-0 right-0 h-full w-80 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 border-l border-gray-700 transform transition-transform duration-300 ease-in-out z-[101]"
-          style={{ transform: isOpen ? 'translateX(0)' : 'translateX(100%)' }}
-        >
-          {/* Menu Header */}
-          <div className="p-6 border-b border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                {/* <Logo size="lg" /> */}
-                <div>
-                  <h2 className="text-xl font-bold text-white">Menu</h2>
-                  <p className="text-sm text-gray-400">Navigation</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 rounded-lg bg-gray-800 border border-gray-600 text-white hover:bg-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Navigation Items */}
-          <nav className="p-4">
-            <ul className="space-y-3">
-              {navigationItems.map((item) => {
-                const IconComponent = item.icon;
-                const active = isActive(item.href);
-                
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
-                      className={`group flex items-center px-4 py-4 rounded-xl text-base font-medium transition-all duration-200 touch-manipulation ${
-                        active
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg transform scale-105'
-                          : 'text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-105'
-                      }`}
-                    >
-                      <IconComponent className={`w-6 h-6 mr-4 ${
-                        active ? 'text-white' : 'text-gray-400 group-hover:text-white'
-                      }`} />
-                      <span>{item.label}</span>
-                      
-                      {active && (
-                        <div className="ml-auto">
-                          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                        </div>
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-
-          {/* Wallet Section */}
-          <div className="absolute bottom-6 left-4 right-4">
-            <div className="p-4 bg-gray-800 rounded-xl border border-gray-700">
-              <div className="flex items-center space-x-3 mb-4">
-                {connected ? (
-                  <Wifi className="w-5 h-5 text-green-400" />
-                ) : (
-                  <WifiOff className="w-5 h-5 text-red-400" />
-                )}
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    {connected ? 'Connected' : 'Disconnected'}
-                  </p>
-                  <p className="text-xs text-gray-400">Solana Network</p>
-                </div>
-              </div>
-              <WalletMultiButton className="!w-full !bg-gradient-to-r !from-blue-600 !to-purple-600 !border-0 !rounded-lg !text-white hover:!opacity-90" />
-            </div>
-          </div>
-        </div>
-      </div>
+      <SimpleMobileMenu isOpen={isOpen} onClose={() => setIsOpen(false)} navigationItems={navigationItems} />
     </>
   );
 };
